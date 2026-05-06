@@ -1,6 +1,6 @@
 # @quire/api-client
 
-A TypeScript client for the [Quire](https://quire.io) REST API.
+A TypeScript client for the [Quire](https://quire.io) [REST API](https://quire.io/dev/api/).
 
 Typed wrappers around `fetch`, OAuth helpers, and error-formatting utilities for the Quire API. Used by the [Quire CLI](https://github.com/quire-io/quire-cli) and other Node-based Quire integrations.
 
@@ -28,6 +28,8 @@ Requires Node.js 20+.
 | Type definitions | `QuireTask`, `QuireProject`, `QuireOrganization`, `QuireUser`, `QuireRecurrence`, etc. |
 
 ## Usage
+
+Register an OAuth client and look up scopes / endpoints in the [Quire API docs](https://quire.io/dev/api/).
 
 ### Confidential client (e.g. server-side OAuth)
 
