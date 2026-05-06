@@ -1,4 +1,4 @@
-// Public API surface for @quire/api-client.
+// Public API surface for @quire-io/api-client.
 
 export { QuireClient } from "./client.js";
 export type {

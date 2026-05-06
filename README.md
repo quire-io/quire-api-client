@@ -1,4 +1,4 @@
-# @quire/api-client
+# @quire-io/api-client
 
 A TypeScript client for the [Quire](https://quire.io) [REST API](https://quire.io/dev/api/).
 
@@ -9,7 +9,7 @@ Typed wrappers around `fetch`, OAuth helpers, and error-formatting utilities for
 ## Install
 
 ```bash
-npm install @quire/api-client
+npm install @quire-io/api-client
 ```
 
 Requires Node.js 20+.
@@ -38,7 +38,7 @@ import {
   QuireClient,
   exchangeCode,
   refreshTokens,
-} from "@quire/api-client";
+} from "@quire-io/api-client";
 
 const tokens = await exchangeCode({
   apiServer: "https://quire.io",
@@ -73,7 +73,7 @@ import {
   QuireClient,
   exchangeCode,
   refreshTokens,
-} from "@quire/api-client";
+} from "@quire-io/api-client";
 
 // During login: PKCE code_verifier is generated alongside code_challenge
 // and stored in memory until the redirect comes back.

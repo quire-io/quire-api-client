@@ -1,5 +1,5 @@
 {
-  "name": "@quire/api-client",
+  "name": "@quire-io/api-client",
   "version": "0.1.0",
   "description": "TypeScript client for the Quire API — typed endpoints, OAuth helpers, error formatting.",
   "license": "MIT",
