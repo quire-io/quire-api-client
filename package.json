@@ -1,0 +1,40 @@
+{
+  "name": "@quire/api-client",
+  "version": "0.1.0",
+  "description": "TypeScript client for the Quire API — typed endpoints, OAuth helpers, error formatting.",
+  "license": "MIT",
+  "author": "Potix Corporation",
+  "homepage": "https://github.com/quire-io/quire-api-client",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quire-io/quire-api-client.git"
+  },
+  "bugs": {
+    "url": "https://github.com/quire-io/quire-api-client/issues"
+  },
+  "keywords": ["quire", "api", "client", "typescript", "oauth"],
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist/", "README.md", "LICENSE", "CHANGES.md"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.2.4"
+  }
+}

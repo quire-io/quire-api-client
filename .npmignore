@@ -1,0 +1,16 @@
+node_modules/
+src/
+dist/**/__tests__/
+dist/**/*.test.*
+*.tgz
+.gitignore
+.github/
+.idea/
+.vscode/
+.claude/
+.DS_Store
+coverage/
+tsconfig.json
+vitest.config.ts
+vitest.config.d.ts
+vitest.config.js
