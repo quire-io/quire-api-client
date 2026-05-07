@@ -4,7 +4,7 @@
 
 Endpoints wrapped by [`QuireClient`](src/client.ts). Compare against the [Quire REST API docs](https://quire.io/dev/api/) to spot gaps.
 
-Generated from 105 client methods covering 111 endpoints across 21 sections.
+Generated from 106 client methods covering 112 endpoints across 22 sections.
 
 ## User
 
@@ -221,3 +221,9 @@ Generated from 105 client methods covering 111 endpoints across 21 sections.
 | `renameInsightField` | `PUT` | `/api/insight/rename-field/{insightOid}/{fieldName}/{newName}` |
 | `moveInsightField` | `PUT` | `/api/insight/move-field/{insightOid}/{fieldName}[?…]` |
 | `removeInsightField` | `DELETE` | `/api/insight/remove-field/{insightOid}/{fieldName}` |
+
+## Notifications
+
+| Method | HTTP | Endpoint |
+|---|---|---|
+| `sendNotification` | `POST` | `/api/notification` |

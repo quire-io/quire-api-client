@@ -1699,4 +1699,23 @@ export class QuireClient {
       { method: "DELETE" },
     );
   }
+
+  // -----------------------------------------------------------------------
+  // Notifications
+  //
+  // POST /notification fires an in-app notification to the *current* user
+  // (the one whose access token is making the call) — not to arbitrary
+  // recipients. Requires the `share` scope (`arNotification` server-side);
+  // calls without it return 403. No response body.
+  // -----------------------------------------------------------------------
+
+  async sendNotification(body: {
+    message: string;
+    url?: string;
+  }): Promise<void> {
+    await this.fetch<void>(`/notification`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
 }
