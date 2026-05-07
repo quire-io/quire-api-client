@@ -104,7 +104,7 @@ function isThisFetch(expr) {
   return (
     ts.isPropertyAccessExpression(expr) &&
     expr.expression.kind === ts.SyntaxKind.ThisKeyword &&
-    expr.name.text === "fetch"
+    (expr.name.text === "fetch" || expr.name.text === "fetchText")
   );
 }
 

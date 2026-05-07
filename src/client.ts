@@ -279,7 +279,15 @@ export class QuireClient {
     });
   }
 
-  private async fetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // Shared request core: handles auth, the 401-refresh-retry dance, and
+  // error formatting. Returns the raw Response so callers can choose how
+  // to read the body — `fetch()` parses JSON, `fetchText()` returns the
+  // string body (used by the project export endpoints, which don't share
+  // the structured-object response shape every other endpoint has).
+  private async requestRaw(
+    path: string,
+    options: RequestInit = {},
+  ): Promise<Response> {
     let res = await this.rawFetch(path, options, await this.getAccessToken());
 
     // 401 despite a non-expired access token means Quire invalidated it
@@ -309,12 +317,33 @@ export class QuireClient {
       );
     }
 
+    return res;
+  }
+
+  private async fetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const res = await this.requestRaw(path, options);
+
     // 204 No Content — DELETE endpoints (and some PUTs) have no body.
     if (res.status === 204 || res.headers.get("content-length") === "0") {
       return undefined as T;
     }
 
     return res.json() as Promise<T>;
+  }
+
+  // Read the response as a raw string. Used by endpoints that return a
+  // non-JSON payload (e.g. /project/export-csv); preserves byte fidelity so
+  // callers can write the result straight to disk without a JSON re-stringify
+  // round-trip.
+  private async fetchText(
+    path: string,
+    options: RequestInit = {},
+  ): Promise<string> {
+    const res = await this.requestRaw(path, options);
+    if (res.status === 204 || res.headers.get("content-length") === "0") {
+      return "";
+    }
+    return res.text();
   }
 
   // -----------------------------------------------------------------------
@@ -443,6 +472,35 @@ export class QuireClient {
       method: "PUT",
       body: JSON.stringify(body),
     });
+  }
+
+  // -----------------------------------------------------------------------
+  // Project export
+  //
+  // Returns the project dump as a raw string body — caller decides whether
+  // to write it to disk or parse. The export endpoints don't share the
+  // structured-object response shape every other endpoint has (CSV is text,
+  // JSON is a file payload), so they bypass the JSON parser via fetchText.
+  // -----------------------------------------------------------------------
+
+  async exportProjectCsv(projectOid: string): Promise<string> {
+    return this.fetchText(`/project/export-csv/${projectOid}`);
+  }
+
+  async exportProjectCsvById(projectId: string): Promise<string> {
+    return this.fetchText(
+      `/project/export-csv/id/${encodeURIComponent(projectId)}`,
+    );
+  }
+
+  async exportProjectJson(projectOid: string): Promise<string> {
+    return this.fetchText(`/project/export-json/${projectOid}`);
+  }
+
+  async exportProjectJsonById(projectId: string): Promise<string> {
+    return this.fetchText(
+      `/project/export-json/id/${encodeURIComponent(projectId)}`,
+    );
   }
 
   // -----------------------------------------------------------------------

@@ -4,7 +4,7 @@
 
 Endpoints wrapped by [`QuireClient`](src/client.ts). Compare against the [Quire REST API docs](https://quire.io/dev/api/) to spot gaps.
 
-Generated from 106 client methods covering 112 endpoints across 22 sections.
+Generated from 110 client methods covering 116 endpoints across 23 sections.
 
 ## User
 
@@ -34,6 +34,15 @@ Generated from 106 client methods covering 112 endpoints across 22 sections.
 | `getProjectById` | `GET` | `/api/project/id/{projectId}` |
 | `listProjectMembers` | `GET` | `/api/user/list/project/{projectOid}` |
 | `updateProject` | `PUT` | `/api/project/{projectOid}` |
+
+## Project export
+
+| Method | HTTP | Endpoint |
+|---|---|---|
+| `exportProjectCsv` | `GET` | `/api/project/export-csv/{projectOid}` |
+| `exportProjectCsvById` | `GET` | `/api/project/export-csv/id/{projectId}` |
+| `exportProjectJson` | `GET` | `/api/project/export-json/{projectOid}` |
+| `exportProjectJsonById` | `GET` | `/api/project/export-json/id/{projectId}` |
 
 ## Project custom-field definitions — Apr 22 2026
 

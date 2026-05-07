@@ -175,6 +175,49 @@ describe("apiServer URL normalization", () => {
   });
 });
 
+describe("project export endpoints", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  it("exportProjectCsv returns the raw body string (no JSON parse)", async () => {
+    const csv = "id,name\n1,Hello\n2,\"with, comma\"\n";
+    fetchMock.mockResolvedValueOnce(
+      new Response(csv, { status: 200, headers: { "content-type": "text/csv" } }),
+    );
+
+    await expect(mkClient().exportProjectCsv("oid-p1")).resolves.toBe(csv);
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      "https://quire.io/api/project/export-csv/oid-p1",
+    );
+  });
+
+  it("exportProjectJsonById percent-encodes the slug and returns raw text", async () => {
+    const body = '{"name":"My Project","tasks":[]}';
+    fetchMock.mockResolvedValueOnce(
+      new Response(body, { status: 200, headers: { "content-type": "application/json" } }),
+    );
+
+    await expect(
+      mkClient().exportProjectJsonById("acme/my project"),
+    ).resolves.toBe(body);
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      "https://quire.io/api/project/export-json/id/acme%2Fmy%20project",
+    );
+  });
+});
+
 describe("listTasks / listSubtasks pagination params", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
