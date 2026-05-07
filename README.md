@@ -18,7 +18,7 @@ Requires Node.js 20+.
 
 | Module | Exports |
 |---|---|
-| `QuireClient` | Authenticated client covering tasks, projects, organizations, comments, chats, documents, insights, partners, sublists, statuses, tags, custom fields, attachments, timelogs, approvals, undo. Auto-refreshes tokens via a caller-supplied callback. |
+| `QuireClient` | Authenticated client covering tasks, projects, organizations, comments, chats, documents, insights, partners, sublists, statuses, tags, custom fields, attachments, timelogs, approvals, undo. Auto-refreshes tokens via a caller-supplied callback. See [COVERAGE.md](COVERAGE.md) for the full per-endpoint table. |
 | `exchangeCode` / `refreshTokens` | Parametrized OAuth helpers. Supports both confidential clients (pass `clientSecret`) and public PKCE clients (pass `codeVerifier`). |
 | `formatQuireError` | Maps an HTTP error response into a short, user-readable string. Knows about Quire's quota / rate-limit / paid-plan signals. |
 | `QuireAuthRevokedError`, `QuireTokenRefreshError` | Typed errors thrown by `QuireClient` and the OAuth helpers. |
@@ -129,9 +129,10 @@ The logger interface is `{ error, info, debug?, warn? }` — any structural matc
 
 ```bash
 npm install
-npm test           # vitest
-npm run typecheck  # tsc --noEmit
-npm run build      # tsc → dist/
+npm test            # vitest
+npm run typecheck   # tsc --noEmit
+npm run build       # tsc → dist/
+npm run gen-coverage  # regenerate COVERAGE.md from src/client.ts
 ```
 
 ## License

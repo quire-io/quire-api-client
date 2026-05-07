@@ -30,6 +30,8 @@
     "build": "tsc",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "gen-coverage": "node scripts/gen-coverage.mjs",
+    "check-coverage": "node scripts/gen-coverage.mjs && git diff --exit-code COVERAGE.md",
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {

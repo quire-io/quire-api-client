@@ -627,6 +627,14 @@ export class QuireClient {
     );
   }
 
+  // -----------------------------------------------------------------------
+  // Task search
+  //
+  // Three scoped variants share the same QuireTaskSearchParams surface;
+  // org- and folder-scope reject `sublist=` and per-project custom-field
+  // filters (those are project-scope only — see QuireTaskSearchParams).
+  // -----------------------------------------------------------------------
+
   async searchTasks(
     projectOid: string,
     params: QuireTaskSearchParams,
@@ -658,6 +666,10 @@ export class QuireClient {
       `/task/search-folder/${folderOid}${toSearchQueryString(params)}`,
     );
   }
+
+  // -----------------------------------------------------------------------
+  // Tasks (create, update, move, transfer)
+  // -----------------------------------------------------------------------
 
   async createTask(
     projectOid: string,
@@ -1113,6 +1125,10 @@ export class QuireClient {
       { method: "DELETE" },
     );
   }
+
+  // -----------------------------------------------------------------------
+  // Tasks (continued) — delete, attachments, undo
+  // -----------------------------------------------------------------------
 
   async deleteTask(taskOid: string): Promise<void> {
     await this.fetch<void>(`/task/${taskOid}`, { method: "DELETE" });

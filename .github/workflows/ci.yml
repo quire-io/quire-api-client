@@ -27,6 +27,11 @@ jobs:
       - run: npm test
       - run: npm run build
 
+      # Drift guard: COVERAGE.md is generated from src/client.ts. If a
+      # new endpoint lands without re-running `npm run gen-coverage`,
+      # this job fails with a diff so the PR author re-runs it locally.
+      - run: npm run check-coverage
+
       # Catch publishability regressions early — `npm pack --dry-run` is
       # what npm publish runs internally, so packaging issues (missing
       # files, .npmignore mistakes, exports-map mismatches) show up here
