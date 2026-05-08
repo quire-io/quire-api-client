@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 — 2026-05-08
+
+- `QuireClientOptions.headers` — optional `Record<string, string>` merged into every outgoing request before per-request headers. Callers use this to inject `User-Agent`, `X-Request-ID`, or other global headers without patching each call site.
+
 ## 0.1.2 — 2026-05-07
 
 - `QuireClient.exportProjectCsv(projectOid)` / `exportProjectCsvById(projectId)` / `exportProjectJson(projectOid)` / `exportProjectJsonById(projectId)` — wrap `GET /api/project/export-csv/*` and `/api/project/export-json/*`. Each returns the raw response body as a string (CSV text or JSON dump) so callers can stream straight to disk; pass through `JSON.parse` if you want the parsed object.

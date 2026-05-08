@@ -78,6 +78,8 @@ export interface QuireClientOptions {
   onAuthRevoked?: OnAuthRevoked;
   /** Optional structured logger. Defaults to silent. */
   logger?: QuireLogger;
+  /** Extra HTTP headers merged into every request (e.g. `User-Agent`). Per-request headers take precedence. */
+  headers?: Record<string, string>;
 }
 
 // Query params accepted by /task/search, /task/search-organization, and
@@ -208,6 +210,7 @@ export class QuireClient {
   private readonly refreshTokensFn?: RefreshTokensFn;
   private onTokenRefresh?: OnTokenRefresh;
   private onAuthRevoked?: OnAuthRevoked;
+  private readonly extraHeaders: Record<string, string>;
 
   constructor(options: QuireClientOptions) {
     this.tokens = options.tokens;
@@ -216,6 +219,7 @@ export class QuireClient {
     this.refreshTokensFn = options.refreshTokens;
     this.onTokenRefresh = options.onTokenRefresh;
     this.onAuthRevoked = options.onAuthRevoked;
+    this.extraHeaders = options.headers ?? {};
   }
 
   /** Snapshot the current tokens (e.g. after an external rotation event). */
@@ -274,6 +278,7 @@ export class QuireClient {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
+        ...this.extraHeaders,
         ...(options.headers as Record<string, string> | undefined),
       },
     });
