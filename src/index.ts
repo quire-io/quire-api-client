@@ -31,6 +31,17 @@ export type { ParsedQuireUrl } from "./url.js";
 
 export { COLOR_TABLE, NAMED_COLORS, resolveColor } from "./colors.js";
 
+export {
+  evaluateFormula,
+  evaluateTaskFormulaFields,
+  flattenTaskTree,
+  parseExportJson,
+} from "./formula.js";
+export type { FormulaContext, FormulaValue } from "./formula.js";
+
+export { loadProjectTasksForFormula } from "./formula-loader.js";
+export type { FormulaTasksResult } from "./formula-loader.js";
+
 export type {
   QuireApproval,
   QuireApprovalCategory,
