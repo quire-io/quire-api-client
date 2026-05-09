@@ -36,6 +36,7 @@ export {
   evaluateTaskFormulaFields,
   flattenTaskTree,
   parseExportJson,
+  QureDuration,
 } from "./formula.js";
 export type { FormulaContext, FormulaValue } from "./formula.js";
 

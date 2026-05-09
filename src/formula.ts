@@ -16,7 +16,19 @@ import type { QuireTask, QuireTaskNode, QuireFieldDefinition } from "./types.js"
 // Public API
 // ---------------------------------------------------------------------------
 
-export type FormulaValue = null | boolean | number | string | Date | FormulaValue[];
+/** A Quire duration value (time span measured in whole seconds). */
+export class QureDuration {
+  readonly seconds: number;
+  constructor(seconds: number) { this.seconds = Math.round(seconds); }
+  /** Total days, ceiling-rounded. */
+  get days()    { return Math.ceil(this.seconds / 86400); }
+  /** Total hours, ceiling-rounded. */
+  get hours()   { return Math.ceil(this.seconds / 3600); }
+  /** Total minutes, ceiling-rounded. */
+  get minutes() { return Math.ceil(this.seconds / 60); }
+}
+
+export type FormulaValue = null | boolean | number | string | Date | QureDuration | FormulaValue[];
 
 export interface FormulaContext {
   /** The task the formula is being evaluated on. */
@@ -98,7 +110,7 @@ export function parseExportJson(raw: string): QuireTask[] {
 // ---------------------------------------------------------------------------
 
 type TK =
-  | "NUM" | "STR" | "DATE" | "ID" | "CUSTOM"
+  | "NUM" | "STR" | "DATE" | "DUR" | "ID" | "CUSTOM"
   | "LP" | "RP" | "LB" | "RB"
   | "DOT" | "COMMA" | "COLON" | "QUEST"
   | "PLUS" | "MINUS" | "STAR" | "SLASH" | "PCT" | "CARET" | "AMP"
@@ -163,10 +175,36 @@ function tokenize(src: string): Tok[] {
       continue;
     }
 
-    // Numbers (positive only; unary minus handled in parser)
+    // Numbers / duration literals (positive only; unary sign handled in parser).
+    // Duration formats: MM:SS  or  HH:MM:SS  (no spaces inside, integer fields).
     if (/\d/.test(ch)) {
-      let n = "";
-      while (i < src.length && /[\d.]/.test(src.charAt(i))) n += src.charAt(i++);
+      let first = "";
+      while (i < src.length && /\d/.test(src.charAt(i))) first += src.charAt(i++);
+      // Peek for duration pattern: <digits>:<digits>
+      if (src.charAt(i) === ":" && /\d/.test(src.charAt(i + 1))) {
+        i++; // skip first ':'
+        let second = "";
+        while (i < src.length && /\d/.test(src.charAt(i))) second += src.charAt(i++);
+        if (src.charAt(i) === ":" && /\d/.test(src.charAt(i + 1))) {
+          // HH:MM:SS
+          i++; // skip second ':'
+          let third = "";
+          while (i < src.length && /\d/.test(src.charAt(i))) third += src.charAt(i++);
+          const secs = parseInt(first, 10) * 3600 + parseInt(second, 10) * 60 + parseInt(third, 10);
+          out.push({ kind: "DUR", val: String(secs) });
+        } else {
+          // MM:SS
+          const secs = parseInt(first, 10) * 60 + parseInt(second, 10);
+          out.push({ kind: "DUR", val: String(secs) });
+        }
+        continue;
+      }
+      // Plain number — allow decimal point
+      let n = first;
+      if (src.charAt(i) === "." && /\d/.test(src.charAt(i + 1))) {
+        n += src.charAt(i++); // '.'
+        while (i < src.length && /\d/.test(src.charAt(i))) n += src.charAt(i++);
+      }
       out.push({ kind: "NUM", val: n });
       continue;
     }
@@ -240,6 +278,7 @@ function tokenize(src: string): Tok[] {
 
 type Expr =
   | { t: "num";    v: number }
+  | { t: "dur";    v: number }   // total seconds
   | { t: "str";    v: string }
   | { t: "date";   v: string }
   | { t: "id";     n: string }
@@ -453,6 +492,7 @@ class Parser {
     const t = this.cur();
 
     if (t.kind === "NUM")    { this.pos++; return { t: "num", v: Number(t.val) }; }
+    if (t.kind === "DUR")    { this.pos++; return { t: "dur", v: Number(t.val) }; }
     if (t.kind === "STR") {
       this.pos++;
       let s = t.val;
@@ -499,6 +539,7 @@ interface EvalCtx extends FormulaContext {
 function evalExpr(e: Expr, ctx: EvalCtx): unknown {
   switch (e.t) {
     case "num":  return e.v;
+    case "dur":  return new QureDuration(e.v);
     case "str":  return e.v;
     case "date": return evalDate(e.v);
 
@@ -530,8 +571,14 @@ function evalExpr(e: Expr, ctx: EvalCtx): unknown {
 
     case "unary": {
       const v = evalExpr(e.x, ctx);
-      if (e.op === "-") { const n = asNumber(v); return n !== null ? -n : null; }
-      if (e.op === "+") return asNumber(v);
+      if (e.op === "-") {
+        if (v instanceof QureDuration) return new QureDuration(-v.seconds);
+        const n = asNumber(v); return n !== null ? -n : null;
+      }
+      if (e.op === "+") {
+        if (v instanceof QureDuration) return v;
+        return asNumber(v);
+      }
       if (e.op === "not") return !isTruthy(v);
       return null;
     }
@@ -746,20 +793,70 @@ function evalCall(fn: string, argExprs: Expr[], ctx: EvalCtx): unknown {
       return Array.isArray(v) ? v.length > 0 : (v !== null && v !== undefined);
     }
     case "SUM": {
-      const nums = args().flat(Infinity).filter((v): v is number => typeof v === "number");
+      const flat = args().flat(Infinity);
+      const items = flat.filter(v => v !== null && v !== undefined);
+      if (items.length === 0) return null;
+      const hasDur = items.some(v => v instanceof QureDuration);
+      if (hasDur) {
+        let secs = 0;
+        for (const v of items) secs += v instanceof QureDuration ? v.seconds : (asNumber(v) ?? 0);
+        return new QureDuration(secs);
+      }
+      const nums = items.filter((v): v is number => typeof v === "number");
       return nums.length === 0 ? null : nums.reduce((a, b) => a + b, 0);
     }
     case "AVG": {
-      const nums = args().flat(Infinity).filter((v): v is number => typeof v === "number");
+      const flat = args().flat(Infinity);
+      const items = flat.filter(v => v !== null && v !== undefined);
+      if (items.length === 0) return null;
+      const hasDur = items.some(v => v instanceof QureDuration);
+      if (hasDur) {
+        let secs = 0;
+        for (const v of items) secs += v instanceof QureDuration ? v.seconds : (asNumber(v) ?? 0);
+        return new QureDuration(Math.round(secs / items.length));
+      }
+      const nums = items.filter((v): v is number => typeof v === "number");
       return nums.length === 0 ? null : nums.reduce((a, b) => a + b, 0) / nums.length;
     }
     case "MAX": {
-      const nums = args().flat(Infinity).filter((v): v is number => typeof v === "number");
+      const flat = args().flat(Infinity);
+      const items = flat.filter(v => v !== null && v !== undefined);
+      if (items.length === 0) return null;
+      const hasDur = items.some(v => v instanceof QureDuration);
+      if (hasDur) {
+        const secs = items.map(v => v instanceof QureDuration ? v.seconds : (asNumber(v) ?? 0));
+        return new QureDuration(Math.max(...secs));
+      }
+      const nums = items.filter((v): v is number => typeof v === "number");
       return nums.length === 0 ? null : Math.max(...nums);
     }
     case "MIN": {
-      const nums = args().flat(Infinity).filter((v): v is number => typeof v === "number");
+      const flat = args().flat(Infinity);
+      const items = flat.filter(v => v !== null && v !== undefined);
+      if (items.length === 0) return null;
+      const hasDur = items.some(v => v instanceof QureDuration);
+      if (hasDur) {
+        const secs = items.map(v => v instanceof QureDuration ? v.seconds : (asNumber(v) ?? 0));
+        return new QureDuration(Math.min(...secs));
+      }
+      const nums = items.filter((v): v is number => typeof v === "number");
       return nums.length === 0 ? null : Math.min(...nums);
+    }
+    case "WORKDAYS": {
+      const [d1raw, d2raw, modeRaw] = args();
+      if (!(d1raw instanceof Date) || !(d2raw instanceof Date)) return null;
+      const d1 = new Date(d1raw); d1.setHours(0, 0, 0, 0);
+      const d2 = new Date(d2raw); d2.setHours(0, 0, 0, 0);
+      if (d2 < d1) return 0;
+      const mode = modeRaw !== null && modeRaw !== undefined ? (asNumber(modeRaw) ?? 1) : 1;
+      const wknd = workdayWeekends(mode);
+      let count = 0;
+      const cur = new Date(d1);
+      while (cur <= d2) {
+        if (!wknd.has(cur.getDay())) count++;
+        cur.setDate(cur.getDate() + 1);
+      }
+      return count;
     }
     case "SORT": {
       // sort() / sort(null) → null; nulls removed from output
@@ -844,6 +941,12 @@ function evalBinop(op: string, lExpr: Expr, rExpr: Expr, ctx: EvalCtx): unknown 
 function applyOp(op: string, l: unknown, r: unknown): unknown {
   switch (op) {
     case "+": {
+      // Duration arithmetic
+      if (l instanceof QureDuration && r instanceof QureDuration) return new QureDuration(l.seconds + r.seconds);
+      if (l instanceof Date && r instanceof QureDuration) return new Date(l.getTime() + r.seconds * 1000);
+      if (l instanceof QureDuration && r instanceof Date) return new Date(r.getTime() + l.seconds * 1000);
+      if (l instanceof QureDuration && typeof r === "number") return new QureDuration(l.seconds + r);
+      if (typeof l === "number" && r instanceof QureDuration) return new QureDuration(l + r.seconds);
       if (l instanceof Date && typeof r === "number") return new Date(l.getTime() + r * 1000);
       if (typeof l === "number" && r instanceof Date) return new Date(r.getTime() + l * 1000);
       // Date + null → Date; null + Date → Date (special cases, not general null arithmetic)
@@ -855,7 +958,11 @@ function applyOp(op: string, l: unknown, r: unknown): unknown {
       return ln !== null && rn !== null ? ln + rn : null;
     }
     case "-": {
-      if (l instanceof Date && r instanceof Date) return (l.getTime() - r.getTime()) / 1000;
+      // Duration arithmetic
+      if (l instanceof Date && r instanceof Date) return new QureDuration((l.getTime() - r.getTime()) / 1000);
+      if (l instanceof Date && r instanceof QureDuration) return new Date(l.getTime() - r.seconds * 1000);
+      if (l instanceof QureDuration && r instanceof QureDuration) return new QureDuration(l.seconds - r.seconds);
+      if (l instanceof QureDuration && typeof r === "number") return new QureDuration(l.seconds - r);
       if (l instanceof Date && typeof r === "number") return new Date(l.getTime() - r * 1000);
       // String subtraction: str - null → str; str - str → remove prefix; str - N → remove last N chars
       if (typeof l === "string") {
@@ -868,6 +975,9 @@ function applyOp(op: string, l: unknown, r: unknown): unknown {
       return ln !== null && rn !== null ? ln - rn : null;
     }
     case "*": {
+      // Duration arithmetic
+      if (l instanceof QureDuration && typeof r === "number") return new QureDuration(l.seconds * r);
+      if (typeof l === "number" && r instanceof QureDuration) return new QureDuration(l * r.seconds);
       // String repetition: str * N → repeat N times; str * null/0/neg → ''
       if (typeof l === "string") {
         if (r === null || r === undefined) return "";
@@ -883,6 +993,9 @@ function applyOp(op: string, l: unknown, r: unknown): unknown {
       return ln !== null && rn !== null ? ln * rn : null;
     }
     case "/": {
+      // Duration arithmetic: dur / num → dur; num / dur → num (seconds-based)
+      if (l instanceof QureDuration && typeof r === "number") return r !== 0 ? new QureDuration(l.seconds / r) : null;
+      if (typeof l === "number" && r instanceof QureDuration) return r.seconds !== 0 ? l / r.seconds : null;
       if (typeof l === "string") return NaN; // str / anything → NaN
       const ln = asNumber(l), rn = asNumber(r);
       return ln !== null && rn !== null && rn !== 0 ? ln / rn : null;
@@ -909,6 +1022,30 @@ function getMember(obj: unknown, prop: string, ctx: EvalCtx): unknown {
 
   // Array: apply member to each element (list vs property)
   if (Array.isArray(obj)) return obj.map(item => getMember(item, prop, ctx));
+
+  // Date: .year, .month, .day, .hour, .minute, .second
+  if (obj instanceof Date) {
+    switch (lo) {
+      case "year":   return obj.getFullYear();
+      case "month":  return obj.getMonth() + 1;
+      case "day":    return obj.getDate();
+      case "hour":   return obj.getHours();
+      case "minute": return obj.getMinutes();
+      case "second": return obj.getSeconds();
+    }
+    return null;
+  }
+
+  // Duration: .days, .hours, .minutes, .seconds
+  if (obj instanceof QureDuration) {
+    switch (lo) {
+      case "days":    return obj.days;
+      case "hours":   return obj.hours;
+      case "minutes": return obj.minutes;
+      case "seconds": return obj.seconds;
+    }
+    return null;
+  }
 
   // Task object
   if (isTask(obj)) return evalId(lo, { ...ctx, task: obj as QuireTask });
@@ -943,6 +1080,7 @@ function evalDate(raw: string): Date | null {
   today.setHours(0, 0, 0, 0);
   const s = raw.trim().toLowerCase();
 
+  if (s === "now")       return new Date();
   if (s === "today")     return today;
   if (s === "tomorrow")  { const d = new Date(today); d.setDate(d.getDate() + 1); return d; }
   if (s === "yesterday") { const d = new Date(today); d.setDate(d.getDate() - 1); return d; }
@@ -998,11 +1136,30 @@ function isTruthy(v: unknown): boolean {
 function asNumber(v: unknown): number | null {
   if (v === null || v === undefined) return null;
   if (typeof v === "number") return v;
+  if (v instanceof QureDuration) return v.seconds;
   if (v instanceof Date) return v.getTime() / 1000;
   if (isEnumLike(v) && typeof (v as Record<string, unknown>)["value"] === "number")
     return (v as { value: number }).value;
   const n = Number(v);
   return isNaN(n) ? null : n;
+}
+
+/**
+ * Map Quire's WORKDAYS weekend-mode argument to a set of weekend day-of-week
+ * indices (0 = Sun, 6 = Sat). Encoding follows Excel's WORKDAY.INTL with one
+ * shift: Quire modes 9-15 correspond to Excel modes 11-17 (single-day weekends).
+ */
+function workdayWeekends(mode: number): Set<number> {
+  if (mode >= 1 && mode <= 7) {
+    // Two-day weekends. Mode 1 = Sat+Sun; subsequent modes shift forward.
+    const firstDay = [6, 0, 1, 2, 3, 4, 5][mode - 1] as number;
+    return new Set([firstDay, (firstDay + 1) % 7]);
+  }
+  if (mode >= 9 && mode <= 15) {
+    // Single-day weekends. Mode 9 = Sun only; 10 = Mon; ... 15 = Sat.
+    return new Set([(mode - 9) % 7]);
+  }
+  return new Set([0, 6]); // unknown mode → default Sat+Sun
 }
 
 function toArray(v: unknown): unknown[] {
@@ -1015,6 +1172,7 @@ function compareValues(a: unknown, b: unknown): number | null {
   // null on either side → null for ordering comparisons (#17707)
   if (a === null || a === undefined || b === null || b === undefined) return null;
   if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
+  if (a instanceof QureDuration && b instanceof QureDuration) return a.seconds - b.seconds;
   const an = asNumber(a), bn = asNumber(b);
   if (an !== null && bn !== null) return an - bn;
   if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
@@ -1074,6 +1232,7 @@ function coerce(v: unknown): FormulaValue {
   if (typeof v === "number")  return v;
   if (typeof v === "string")  return v;
   if (v instanceof Date)      return v;
+  if (v instanceof QureDuration) return v;
   if (Array.isArray(v))       return v.map(coerce);
   // Objects that leaked out (e.g. tag {oid, name}) — caller can cast [key: string]
   return v as FormulaValue;

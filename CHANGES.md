@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.5 — 2026-05-09
+
+- Formula evaluator: duration literals (`MM:SS`, `HH:MM:SS`), arithmetic (`dur + dur`, `dur * num`, `num * dur`, `dur / num`, `num / dur`, `dur - dur`, `date + dur`, `date - dur`, `date - date → dur`), and member access (`.days`, `.hours`, `.minutes`, `.seconds`).
+- Formula evaluator: date member access (`.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`).
+- Formula evaluator: `<now>` date literal evaluates to current `Date`.
+- Formula evaluator: `WORKDAYS(date1, date2[, mode])` function. Mode follows Excel WORKDAY.INTL conventions for two-day weekends (1–7) and Quire's shifted single-day weekend codes (9–15, where 9 = Sun-only).
+- `SUM` / `AVG` / `MIN` / `MAX` accept duration arguments and return `QureDuration` when any input is a duration.
+- New public class `QureDuration` (added to `FormulaValue` union).
+
 ## 0.1.4 — 2026-05-09
 
 - Formula evaluation engine (`evaluateFormula`, `evaluateTaskFormulaFields`) — client-side evaluator for the Quire formula language: arithmetic, comparison, logical and string operators, ternary, `where`/`map`/`order by`/`limit`, and aggregate functions (`COUNT`, `SUM`, `AVG`, `MIN`, `MAX`, `SORT`, `DISTINCT`, `ISEMPTY`, `ISNOTEMPTY`, `WORKDAYS`). Full null-propagation semantics matching the server implementation.
