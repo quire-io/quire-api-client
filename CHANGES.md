@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7 — 2026-05-11
+
+- Export `QuireMyTasksScope` and `QuireMyTasksFilter` from the package barrel. 0.1.6 added the types to `src/client.ts` but forgot the `src/index.ts` re-export, so `import type { QuireMyTasksScope } from "@quire-io/api-client"` failed with TS2305. 0.1.7 is the first 0.1.x release on npm; 0.1.6 was tagged on GitHub but never published.
+
 ## 0.1.6 — 2026-05-11
 
 - `QuireClient.getMyTasks(scope, filter?)` — composite helper that returns the [My Tasks view](https://github.com/quire-io/quire-platform-docs/blob/main/product/features/view.md#my-tasks) by leaning on the server's `mine=true` predicate. Three scopes: `{ project }` (free plan; pass `project: "-"` for the user's private Inbox), `{ organization }` (paid plan), or `{ allOrganizations: true, inbox? }` (fan out across every org the user belongs to, dedupe by OID, include Inbox by default). The Inbox path intentionally omits `mine=true` — the server resolves `-` to the inbox project then applies the project-member predicate, which drops undated self-created Inbox captures.
