@@ -8,7 +8,11 @@ export type {
   OnTokenRefresh,
   OnAuthRevoked,
 } from "./client.js";
-export type { QuireTaskSearchParams } from "./client.js";
+export type {
+  QuireMyTasksFilter,
+  QuireMyTasksScope,
+  QuireTaskSearchParams,
+} from "./client.js";
 
 export {
   exchangeCode,
