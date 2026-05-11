@@ -257,3 +257,93 @@ describe("listTasks / listSubtasks pagination params", () => {
     expect(url).toContain("limit=no");
   });
 });
+
+describe("getMyTasks scope routing", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  it("project scope forces mine=true on /task/search/{projectOid}", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().getMyTasks({ project: "oid-p1" }, { status: "active" });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("/task/search/oid-p1");
+    expect(url).toContain("mine=true");
+    expect(url).toContain("status=active");
+  });
+
+  it("project='-' (Inbox) omits mine=true so self-created tasks aren't dropped", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().getMyTasks({ project: "-" }, { status: "active" });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("/task/search/-");
+    expect(url).not.toContain("mine=");
+    expect(url).toContain("status=active");
+  });
+
+  it("organization scope forces mine=true on /task/search-organization/{orgOid}", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().getMyTasks({ organization: "oid-org" }, { priority: "high" });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("/task/search-organization/oid-org");
+    expect(url).toContain("mine=true");
+    expect(url).toContain("priority=high");
+  });
+
+  it("allOrganizations fans out per-org, includes Inbox last, dedupes by oid", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse([{ oid: "o1" }, { oid: "o2" }]))
+      .mockResolvedValueOnce(jsonResponse([{ oid: "t1" }, { oid: "t2" }]))
+      .mockResolvedValueOnce(jsonResponse([{ oid: "t2" }, { oid: "t3" }]))
+      .mockResolvedValueOnce(jsonResponse([{ oid: "t1" }, { oid: "t4" }]));
+    const tasks = await mkClient().getMyTasks(
+      { allOrganizations: true },
+      { status: "active" },
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[0]![0]).toContain("/organization/list");
+    expect(fetchMock.mock.calls[1]![0]).toContain("/task/search-organization/o1");
+    expect(fetchMock.mock.calls[1]![0]).toContain("mine=true");
+    expect(fetchMock.mock.calls[2]![0]).toContain("/task/search-organization/o2");
+    expect(fetchMock.mock.calls[3]![0]).toContain("/task/search/-");
+    expect(fetchMock.mock.calls[3]![0]).not.toContain("mine=");
+    expect(tasks.map((t) => t.oid)).toEqual(["t1", "t2", "t3", "t4"]);
+  });
+
+  it("allOrganizations with inbox=false skips the /task/search/- call", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse([{ oid: "o1" }]))
+      .mockResolvedValueOnce(jsonResponse([{ oid: "t1" }]));
+    const tasks = await mkClient().getMyTasks(
+      { allOrganizations: true, inbox: false },
+      { status: "active" },
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(tasks.map((t) => t.oid)).toEqual(["t1"]);
+  });
+
+  it("allOrganizations strips cursor — cursors don't compose with fan-out", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse([{ oid: "o1" }]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().getMyTasks(
+      { allOrganizations: true },
+      { status: "active", cursor: "tok=abc" },
+    );
+    for (let i = 1; i < fetchMock.mock.calls.length; i++) {
+      expect(fetchMock.mock.calls[i]![0]).not.toContain("cursor=");
+    }
+  });
+});

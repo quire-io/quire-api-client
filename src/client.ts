@@ -150,6 +150,38 @@ export interface QuireTaskSearchParams {
   recurring?: boolean | string;
 }
 
+/**
+ * Scope selector for {@link QuireClient.getMyTasks}. Exactly one variant
+ * must be passed:
+ *
+ * - `project` — restrict to one project (free plan). Pass `"-"` for the
+ *   user's private Inbox; the method skips forcing `mine=true` on that
+ *   path (every Inbox task is the user's by definition, and forcing the
+ *   predicate would drop self-created tasks that aren't also self-assigned).
+ * - `organization` — restrict to one organization (paid plan; same quota
+ *   as `searchTasksInOrganization`).
+ * - `allOrganizations: true` — fan out across every organization the
+ *   authenticated user belongs to (one `/task/search-organization` call
+ *   per org) and merge with dedupe-by-OID. Inbox is included by default;
+ *   pass `inbox: false` to skip it.
+ */
+export type QuireMyTasksScope =
+  | { project: string }
+  | { organization: string }
+  | { allOrganizations: true; inbox?: boolean };
+
+/**
+ * Filter forwarded to the underlying `/task/search*` call(s) by
+ * {@link QuireClient.getMyTasks}. Excludes the fields that would conflict
+ * with the My Tasks predicate: `mine` is forced by the method, and
+ * `assignee` / `assignor` / `follower` / `createdBy` already collapse to
+ * the current user under that predicate.
+ */
+export type QuireMyTasksFilter = Omit<
+  QuireTaskSearchParams,
+  "mine" | "assignee" | "assignor" | "follower" | "createdBy"
+>;
+
 function toSearchQueryString(params: QuireTaskSearchParams): string {
   const parts: string[] = [];
   const push = (k: string, v: unknown): void => {
@@ -728,6 +760,78 @@ export class QuireClient {
     return this.fetch<QuireTask[]>(
       `/task/search-folder/${folderOid}${toSearchQueryString(params)}`,
     );
+  }
+
+  // Composite helper that returns the "My Tasks" view defined in
+  // quire-platform-docs/product/features/view.md#my-tasks. Implements the
+  // spec by leaning on the server-side `mine=true` predicate (which already
+  // encodes the project-member + partner-member rules and the stateful-type
+  // requirement), not by re-deriving the rules client-side. Three scopes:
+  //
+  //   - project: searchTasks(project, mine=true). `project === "-"` targets
+  //     the user's Inbox and intentionally OMITS `mine=true`. The server
+  //     accepts the query but resolves `-` to a project OID before the
+  //     searcher runs (task_api.dart `getTaskScope`), then `mine`'s switch
+  //     case calls `addSqlMyTasksCond(..., inbox: null)` (search_task_api.dart
+  //     ~L163). With `inbox: null` the "always-include-Inbox" branch in
+  //     my_tasks_util.dart is skipped and the Inbox project falls through
+  //     the project-member predicate — which requires self-created tasks
+  //     to have start or due set. That silently drops every undated Inbox
+  //     capture, so we leave `mine` off on this path.
+  //   - organization: searchTasksInOrganization(org, mine=true).
+  //   - allOrganizations: listOrganizations + per-org search-organization
+  //     fan-out with mine=true, deduped by oid. Inbox included by default
+  //     (set `inbox: false` to skip). Cursor is stripped — cursors are
+  //     per-search-call and don't compose with a fan-out.
+  //
+  // The Inbox query path goes through /task/search/-, which the server
+  // requires to carry at least one filter param. The caller's `filter` is
+  // forwarded as-is; if it's empty AND `mine` isn't being added (inbox
+  // path), the server returns its usual `queryParamMissingError`.
+  async getMyTasks(
+    scope: QuireMyTasksScope,
+    filter: QuireMyTasksFilter = {},
+  ): Promise<QuireTask[]> {
+    if ("project" in scope) {
+      const params: QuireTaskSearchParams =
+        scope.project === "-" ? { ...filter } : { ...filter, mine: true };
+      return this.searchTasks(scope.project, params);
+    }
+    if ("organization" in scope) {
+      return this.searchTasksInOrganization(scope.organization, {
+        ...filter,
+        mine: true,
+      });
+    }
+
+    const fanOutFilter: QuireTaskSearchParams = { ...filter, mine: true };
+    delete fanOutFilter.cursor;
+
+    const orgs = await this.listOrganizations();
+    const seen = new Set<string>();
+    const merged: QuireTask[] = [];
+    for (const org of orgs) {
+      const tasks = await this.searchTasksInOrganization(org.oid, fanOutFilter);
+      for (const t of tasks) {
+        if (!seen.has(t.oid)) {
+          seen.add(t.oid);
+          merged.push(t);
+        }
+      }
+    }
+
+    if (scope.inbox !== false) {
+      const inboxFilter: QuireTaskSearchParams = { ...filter };
+      delete inboxFilter.cursor;
+      const inboxTasks = await this.searchTasks("-", inboxFilter);
+      for (const t of inboxTasks) {
+        if (!seen.has(t.oid)) {
+          seen.add(t.oid);
+          merged.push(t);
+        }
+      }
+    }
+    return merged;
   }
 
   // -----------------------------------------------------------------------

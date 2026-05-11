@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 — 2026-05-11
+
+- `QuireClient.getMyTasks(scope, filter?)` — composite helper that returns the [My Tasks view](https://github.com/quire-io/quire-platform-docs/blob/main/product/features/view.md#my-tasks) by leaning on the server's `mine=true` predicate. Three scopes: `{ project }` (free plan; pass `project: "-"` for the user's private Inbox), `{ organization }` (paid plan), or `{ allOrganizations: true, inbox? }` (fan out across every org the user belongs to, dedupe by OID, include Inbox by default). The Inbox path intentionally omits `mine=true` — the server resolves `-` to the inbox project then applies the project-member predicate, which drops undated self-created Inbox captures.
+- New exported types `QuireMyTasksScope` (discriminated union of the three scopes) and `QuireMyTasksFilter` (`QuireTaskSearchParams` minus `mine` / `assignee` / `assignor` / `follower` / `createdBy` — fields that would conflict with the My Tasks predicate).
+
 ## 0.1.5 — 2026-05-09
 
 - Formula evaluator: duration literals (`MM:SS`, `HH:MM:SS`), arithmetic (`dur + dur`, `dur * num`, `num * dur`, `dur / num`, `num / dur`, `dur - dur`, `date + dur`, `date - dur`, `date - date → dur`), and member access (`.days`, `.hours`, `.minutes`, `.seconds`).
