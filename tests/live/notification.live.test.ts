@@ -8,10 +8,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { hasTokens, liveClient, runTag } from "./helpers.js";
+import { hasTokens, liveClient, readEnv, runTag } from "./helpers.js";
 
 describe.skipIf(!hasTokens)("Live API — /notification", () => {
   const client = liveClient();
+  const PROJECT_URL = `https://quire.io/w/${readEnv("QUIRE_TEST_PROJECT_ID")}`;
 
   it("N1 sendNotification({message}) succeeds with just a message", async () => {
     // The wrapper returns void; we just confirm it doesn't throw.
@@ -23,7 +24,7 @@ describe.skipIf(!hasTokens)("Live API — /notification", () => {
   it("N2 sendNotification({message, url}) accepts the optional url field", async () => {
     await client.sendNotification({
       message: `live-test notification w/ url ${runTag}`,
-      url: "https://quire.io/w/Quire_API_Test_Project",
+      url: PROJECT_URL,
     });
   });
 });

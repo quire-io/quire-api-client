@@ -15,6 +15,7 @@ import {
   liveClient,
   readEnv,
   readEnvOptional,
+  retryOn429,
   runTag,
 } from "./helpers.js";
 
@@ -82,23 +83,33 @@ describe.skipIf(!hasTokens)("Live API — /organization", () => {
   it.skipIf(!FREE_ORG_ID)(
     "O5 updateOrganization edits name + description on the free test org",
     async () => {
-      const baseline = await client.getOrganizationById(FREE_ORG_ID!);
+      // Wrap with retryOn429 — SUB7 in subscription.live.test.ts intentionally
+      // burns the free org's minute bucket; if vitest schedules that file
+      // immediately before this one, these calls hit a real 429 with a
+      // ~13s retry-after.
+      const baseline = await retryOn429(() =>
+        client.getOrganizationById(FREE_ORG_ID!),
+      );
       const newName = `${baseline.name} [${runTag}]`;
       const newDescription = `Touched by ${runTag}`;
       try {
-        const put = await client.updateOrganization(baseline.oid, {
-          name: newName,
-          description: newDescription,
-        });
+        const put = await retryOn429(() =>
+          client.updateOrganization(baseline.oid, {
+            name: newName,
+            description: newDescription,
+          }),
+        );
         expect(put.nameText ?? put.name).toBe(newName);
         expect(put.descriptionText ?? put.description).toBe(newDescription);
         // editedAt landed on the response in the same Apr 22 2026 release.
         expect(typeof put.editedAt).toBe("string");
       } finally {
-        await client.updateOrganization(baseline.oid, {
-          name: baseline.name,
-          description: baseline.description ?? "",
-        });
+        await retryOn429(() =>
+          client.updateOrganization(baseline.oid, {
+            name: baseline.name,
+            description: baseline.description ?? "",
+          }),
+        );
       }
     },
   );

@@ -68,6 +68,16 @@ export function readEnvOptional(name: string): string | undefined {
   return env()[name] || undefined;
 }
 
+/**
+ * Returns the access token QuireClient is currently using — post-refresh if
+ * any client method has fired in this file, env-file value otherwise. Use
+ * this for raw `fetch(...)` calls inside tests (e.g. RL1's burst probe) so
+ * they don't read a token that the client has already rotated past.
+ */
+export function currentToken(): string {
+  return currentAccessToken ?? env().QUIRE_TEST_ACCESS_TOKEN ?? "";
+}
+
 // Module-local cache of the latest access token. Starts from the env file;
 // updated whenever QuireClient refreshes (its 5-min pre-emptive window or a
 // 401 retry both rotate it). rawApi reads from this so it stays in sync with
@@ -187,6 +197,34 @@ async function rawRequest<T>(
   return { status: lastStatus, data: lastData };
 }
 
+// One-shot client warmup. QuireClient only refreshes its access token when
+// one of its own methods is called (the pre-emptive window inside the
+// wrapper, or a 401 retry). Tests that call `rawApi` BEFORE any client
+// method would otherwise read the env-file token directly — and that token
+// is stale by the next-day cadence the live suite typically runs at, so
+// rawApi-first tests would 401 even when the refresh token is still valid.
+//
+// Vitest runs each test file in its own worker, so module state (including
+// `cachedClient`) doesn't carry over between files. Files like
+// errors.live.test.ts that import only `rawApi`/`rawApiAs` (no liveClient)
+// still need their tokens warmed — so this helper lazily constructs a
+// client via liveClient() when none exists yet, then triggers a refresh.
+//
+// Resolved as a shared promise so concurrent first-callers all await the
+// same getMe() rather than racing to issue several.
+let warmupPromise: Promise<void> | null = null;
+async function ensureFreshToken(): Promise<void> {
+  if (currentAccessToken) return;
+  if (!warmupPromise) {
+    const client = cachedClient ?? liveClient();
+    warmupPromise = client.getMe().then(
+      () => undefined,
+      () => undefined,
+    );
+  }
+  await warmupPromise;
+}
+
 /**
  * Raw REST call using the same access token QuireClient is currently using.
  *
@@ -202,6 +240,7 @@ export async function rawApi<T = unknown>(
   path: string,
   body?: unknown,
 ): Promise<ApiResult<T>> {
+  await ensureFreshToken();
   const token = currentAccessToken ?? env().QUIRE_TEST_ACCESS_TOKEN;
   return rawRequest<T>(method, path, body, token);
 }
@@ -242,6 +281,7 @@ export async function rawApiUpload<T = unknown>(
   body: Uint8Array,
   contentType: string,
 ): Promise<ApiResult<T>> {
+  await ensureFreshToken();
   const base = (env().QUIRE_API_SERVER ?? "").replace(/\/$/, "");
   const token = currentAccessToken ?? env().QUIRE_TEST_ACCESS_TOKEN;
   const headers: Record<string, string> = { "Content-Type": contentType };
@@ -263,3 +303,65 @@ export async function rawApiUpload<T = unknown>(
 
 /** Unique suffix for resource names so parallel runs don't collide. */
 export const runTag = `live-test-${Date.now()}`;
+
+// ---------------------------------------------------------------------------
+// 429 retry wrapper for QuireClient methods.
+//
+// `rawApi` already retries 429s in-band with the server's Retry-After, but
+// `QuireClient` throws on any non-2xx — including transient 429s when an
+// adjacent test has just burned the minute bucket (e.g. SUB7 burns the free
+// org's quota then O5 fires `client.updateOrganization` on the same org).
+// Wrap such calls with `retryOn429(() => client.foo(...))` to ride out
+// short-lived limiter pressure without polluting the production client with
+// retry policy.
+//
+// Detection is by error-message prefix, not a typed error — QuireClient
+// throws a plain Error whose `.message` is the human-formatted string from
+// `formatQuireError` in src/errors.ts. Quota-exceeded (code 469) errors get
+// a "Quire quota exceeded" prefix instead of "Quire API error 429", so this
+// helper correctly skips retrying those.
+// ---------------------------------------------------------------------------
+
+function parseRetryAfterSeconds(msg: string): number {
+  // formatRetryAfter emits "Ns" for <60s and "Nm" or "Nm Ks" for ≥60s.
+  const minutesForm = msg.match(/retry after (\d+)m(?:\s+(\d+)s)?/);
+  if (minutesForm) {
+    return Number(minutesForm[1]) * 60 + Number(minutesForm[2] ?? 0);
+  }
+  const secondsForm = msg.match(/retry after (\d+)s/);
+  if (secondsForm) return Number(secondsForm[1]);
+  // "precise wait time unavailable" — Quire's minute-bucketed limiter
+  // clears in ≤60s, but 10s is enough for typical adjacency cases.
+  return 10;
+}
+
+/**
+ * Retry a QuireClient call on 429 ("rate limited") with the server-suggested
+ * wait, up to `attempts` times. Re-throws any non-429 error immediately,
+ * and stops retrying when the suggested wait would exceed 60s (signals a
+ * quota-tier throttle that retrying can't clear).
+ */
+export async function retryOn429<T>(
+  fn: () => Promise<T>,
+  attempts = 4,
+): Promise<T> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.startsWith("Quire API error 429") || i === attempts - 1) {
+        throw err;
+      }
+      const waitSeconds = parseRetryAfterSeconds(msg);
+      if (waitSeconds > 60) throw err;
+      const waitMs = waitSeconds * 1000;
+      console.warn(
+        `[retryOn429] 429 hit, waiting ${waitSeconds}s (attempt ${i + 1}/${attempts})`,
+      );
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+  // Unreachable: the loop above either returns or throws on every path.
+  throw new Error("retryOn429: exhausted without returning");
+}

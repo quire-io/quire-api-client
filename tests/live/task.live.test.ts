@@ -24,6 +24,7 @@ import {
   liveClient,
   rawApi,
   readEnv,
+  readEnvOptional,
   runTag,
 } from "./helpers.js";
 import type { QuireTag, QuireTask, QuireUser } from "../../src/index.js";
@@ -40,9 +41,11 @@ describe.skipIf(!hasTokens)("Quire API — /task", () => {
   const PROJECT_ID = readEnv("QUIRE_TEST_PROJECT_ID");
   const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
   const ORG_OID = readEnv("QUIRE_TEST_ORG_OID");
-  // Folder ID of the containing folder in the test workspace
-  // (https://quire.io/f/Test03). Stable fixture, safe to hardcode.
-  const FOLDER_ID = "Test03";
+  // Slug of a folder that contains the test project — used by T5b to probe
+  // `/task/search-folder/id/{folderId}`. Workspace-globally unique, so each
+  // fork sets `QUIRE_TEST_FOLDER_ID` to a folder of theirs. When unset, T5b
+  // skips.
+  const FOLDER_ID = readEnvOptional("QUIRE_TEST_FOLDER_ID");
   const SEARCH_MARKER = `zxq${Date.now()}`; // high-entropy keyword for T5
   const TASK_NAME = `${runTag}-task ${SEARCH_MARKER}`;
 
@@ -133,10 +136,10 @@ describe.skipIf(!hasTokens)("Quire API — /task", () => {
   // Folder-scoped search uses the same decorated shape as org-scoped. The
   // `/id/{folderId}` URL form is not exposed on QuireClient.searchTasksInFolder
   // (which takes an OID), so probe it raw.
-  it("T5b GET /task/search-folder/id/{folderId} finds the task", async () => {
+  it.skipIf(!FOLDER_ID)("T5b GET /task/search-folder/id/{folderId} finds the task", async () => {
     const { status, data } = await rawApi<QuireTask[]>(
       "GET",
-      `/task/search-folder/id/${encodeURIComponent(FOLDER_ID)}?text=${encodeURIComponent(SEARCH_MARKER)}`,
+      `/task/search-folder/id/${encodeURIComponent(FOLDER_ID!)}?text=${encodeURIComponent(SEARCH_MARKER)}`,
     );
     expect(status).toBe(200);
     expect(data.some((t) => t.oid === task.oid)).toBe(true);

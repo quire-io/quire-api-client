@@ -30,6 +30,7 @@
     "build": "tsc",
     "test": "vitest run --project unit",
     "test:live": "vitest run --project live",
+    "test:live:10x": "bash scripts/run-live-10x.sh",
     "test:live:prepare": "tsx scripts/prepare-test-tokens.ts",
     "typecheck": "tsc --noEmit",
     "gen-coverage": "node scripts/gen-coverage.mjs",

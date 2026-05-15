@@ -1,7 +1,7 @@
 /**
  * Live API tests for custom fields on tasks (T18, T19, T20, TC1).
  *
- * Requires these fields to exist in Quire_API_Test_Project:
+ * Requires these fields to exist on the QUIRE_TEST_PROJECT_ID project:
  *   - Cost       (Currency)
  *   - Work time  (Duration)
  *   - Note       (Paragraph)

@@ -5,20 +5,28 @@
  * intra-project. The QuireClient `transferTask` wrapper builds the query
  * string (`?project=<target>` and friends) and PUTs an empty body.
  *
- * Creates a task in a secondary project (Test_Transfer_Project) and transfers
- * it into the configured test project. Cleans up by deleting in afterAll.
+ * Creates a task in a secondary project (QUIRE_TEST_TRANSFER_PROJECT_ID) and
+ * transfers it into the configured test project. Skipped when that env var
+ * isn't set — Quire project ids are workspace-globally unique, so each fork
+ * has to provision its own second project. Cleans up by deleting in afterAll.
  */
 
 import { describe, it, expect, afterAll } from "vitest";
 import type { QuireTask } from "../../src/index.js";
-import { hasTokens, liveClient, rawApi, readEnv, runTag } from "./helpers.js";
+import {
+  hasTokens,
+  liveClient,
+  rawApi,
+  readEnv,
+  readEnvOptional,
+  runTag,
+} from "./helpers.js";
 
-describe.skipIf(!hasTokens)("Live API — /task/transfer", () => {
+const SOURCE_PROJECT_ID = readEnvOptional("QUIRE_TEST_TRANSFER_PROJECT_ID");
+
+describe.skipIf(!hasTokens || !SOURCE_PROJECT_ID)("Live API — /task/transfer", () => {
   const client = liveClient();
   const TARGET_PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
-  // A second project in the test workspace used as the transfer source.
-  // https://quire.io/w/Test_Transfer_Project — stable fixture, safe to hardcode.
-  const SOURCE_PROJECT_ID = "Test_Transfer_Project";
 
   let transferredTaskOid = "";
 
@@ -30,10 +38,10 @@ describe.skipIf(!hasTokens)("Live API — /task/transfer", () => {
 
   it("TT1 transferTask moves the task into the target project", async () => {
     // QuireClient.createTask requires a project OID; use rawApi to create
-    // by project id (Test_Transfer_Project) since we only have the slug.
+    // by project id (the source project slug) since we only have the slug.
     const create = await rawApi<QuireTask>(
       "POST",
-      `/task/id/${encodeURIComponent(SOURCE_PROJECT_ID)}`,
+      `/task/id/${encodeURIComponent(SOURCE_PROJECT_ID!)}`,
       { name: `${runTag}-transfer` },
     );
     expect(create.status).toBe(200);
@@ -51,7 +59,7 @@ describe.skipIf(!hasTokens)("Live API — /task/transfer", () => {
 
     const sourceList = await rawApi<QuireTask[]>(
       "GET",
-      `/task/list/id/${encodeURIComponent(SOURCE_PROJECT_ID)}`,
+      `/task/list/id/${encodeURIComponent(SOURCE_PROJECT_ID!)}`,
     );
     expect(sourceList.status).toBe(200);
     expect(sourceList.data.some((t) => t.oid === transferredTaskOid)).toBe(false);

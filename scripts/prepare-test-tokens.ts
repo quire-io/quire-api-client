@@ -33,7 +33,7 @@ import path from "node:path";
 
 const PORT = 8000;
 const REDIRECT_URI = `http://localhost:${PORT}/callback`;
-const TEST_PROJECT_ID = "Quire_API_Test_Project";
+const DEFAULT_TEST_PROJECT_ID = "Quire_API_Test_Project";
 
 const LOCAL_ENV = path.resolve("tests/live/.env");
 const HOME_ENV_NEW = path.resolve(os.homedir(), ".config/quire/test-api.env");
@@ -74,6 +74,11 @@ async function readEnvFile(): Promise<Record<string, string>> {
 }
 
 const envFile = await readEnvFile();
+
+// Quire project ids are workspace-globally unique, so a fork can't reuse
+// "Quire_API_Test_Project". Honor the env file's slug if set; otherwise fall
+// back to the canonical default for first-time setup of the original repo.
+const TEST_PROJECT_ID = envFile.QUIRE_TEST_PROJECT_ID || DEFAULT_TEST_PROJECT_ID;
 
 function requireConfig(name: string): string {
   const v = envFile[name];
@@ -185,6 +190,9 @@ async function writeEnvFile(params: {
     QUIRE_TEST_PROJECT_OID: params.projectOid,
     QUIRE_TEST_ORG_OID: params.orgOid,
   };
+  if (!("QUIRE_TEST_TRANSFER_PROJECT_ID" in merged))
+    merged.QUIRE_TEST_TRANSFER_PROJECT_ID = "";
+  if (!("QUIRE_TEST_FOLDER_ID" in merged)) merged.QUIRE_TEST_FOLDER_ID = "";
   if (!("QUIRE_TEST_FREE_ORG_ID" in merged)) merged.QUIRE_TEST_FREE_ORG_ID = "";
   if (!("QUIRE_TEST_PAID_ORG_ID" in merged)) merged.QUIRE_TEST_PAID_ORG_ID = "";
 
@@ -198,6 +206,8 @@ async function writeEnvFile(params: {
     "QUIRE_TEST_PROJECT_ID",
     "QUIRE_TEST_PROJECT_OID",
     "QUIRE_TEST_ORG_OID",
+    "QUIRE_TEST_TRANSFER_PROJECT_ID",
+    "QUIRE_TEST_FOLDER_ID",
     "QUIRE_TEST_FREE_ORG_ID",
     "QUIRE_TEST_PAID_ORG_ID",
   ];

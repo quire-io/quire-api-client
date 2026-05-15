@@ -16,14 +16,22 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { QuireTask } from "../../src/index.js";
-import { hasTokens, liveClient, rawApi, readEnv, runTag } from "./helpers.js";
+import {
+  hasTokens,
+  liveClient,
+  rawApi,
+  readEnv,
+  readEnvOptional,
+  runTag,
+} from "./helpers.js";
+
+// Mirrors /task/transfer fixture — optional second project for the
+// cross-project sibling case (TMP4). When unset, TMP4 skips; TMP1-3 still run.
+const SOURCE_PROJECT_ID = readEnvOptional("QUIRE_TEST_TRANSFER_PROJECT_ID");
 
 describe.skipIf(!hasTokens)("Live API — /task/move ?position=", () => {
   const client = liveClient();
   const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
-  // Mirrors /task/transfer fixture — second project for the cross-project
-  // sibling case (TMP4).
-  const SOURCE_PROJECT_ID = "Test_Transfer_Project";
 
   let parent: QuireTask;
   let anchor: QuireTask;
@@ -81,12 +89,12 @@ describe.skipIf(!hasTokens)("Live API — /task/move ?position=", () => {
     expect(parentChildren.some((t) => t.oid === moverOid)).toBe(false);
   });
 
-  it("TMP4 transferTask({task:anchor, position:'before'}) lands cross-project as sibling", async () => {
+  it.skipIf(!SOURCE_PROJECT_ID)("TMP4 transferTask({task:anchor, position:'before'}) lands cross-project as sibling", async () => {
     // Create a task in the source project (by id), transfer in with
     // anchor+position so it ends up as anchor's sibling under `parent`.
     const xfer = await rawApi<QuireTask>(
       "POST",
-      `/task/id/${encodeURIComponent(SOURCE_PROJECT_ID)}`,
+      `/task/id/${encodeURIComponent(SOURCE_PROJECT_ID!)}`,
       { name: `${runTag}-tm-xfer` },
     );
     expect(xfer.status).toBe(200);

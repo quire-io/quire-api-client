@@ -12,7 +12,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { hasTokens, rawApi, rawApiAs, readEnv } from "./helpers.js";
+import type { QuireRateLimit } from "../../src/index.js";
+import { currentToken, hasTokens, rawApi, rawApiAs, readEnv } from "./helpers.js";
 
 describe.skipIf(!hasTokens)("Live API — error responses", () => {
   const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
@@ -83,17 +84,43 @@ describe.skipIf(!hasTokens)("Live API — error responses", () => {
   // Rate-limit response-shape probe. Bursts GET /api/user/me in PARALLEL
   // batches until the first 429 to snapshot the headers Quire emits.
   // Concurrency-sensitive (not sustained-rate-sensitive) — 50 in flight
-  // reliably trips the limiter under any plan tier.
+  // reliably trips the limiter on tiers with a sub-200/min minute bucket.
+  //
+  // Higher tiers (Enterprise: 5000/min) have minute buckets too large for
+  // a 200-request burst to trip. This test queries the org's bucket up-front
+  // and skips when the limit is over the burst size — otherwise we'd burn
+  // quota on a probe that can't observe its target.
   //
   // Uses raw fetch directly so the helper's 429-retry-with-backoff doesn't
   // drain the headers we want to inspect.
-  it("RL1 GET /user/me burst → capture 429 response headers", async () => {
-    const base = (readEnv("QUIRE_API_SERVER") || "").replace(/\/$/, "");
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${readEnv("QUIRE_TEST_ACCESS_TOKEN")}`,
-    };
+  it("RL1 GET /user/me burst → capture 429 response headers", async (ctx) => {
     const BATCH_SIZE = 50;
     const MAX_BATCHES = 4;
+    const TOTAL = BATCH_SIZE * MAX_BATCHES;
+
+    // /rate_limit/{orgOid} is free (doesn't count against quota). Used to
+    // gate the burst — if minute.limit exceeds what TOTAL can hit, skip.
+    const orgOid = readEnv("QUIRE_TEST_ORG_OID");
+    const rl = await rawApi<QuireRateLimit>(
+      "GET",
+      `/rate_limit/${orgOid}`,
+    );
+    const minuteLimit = rl.data?.minute?.limit ?? 0;
+    if (minuteLimit > TOTAL) {
+      console.warn(
+        `[RL1] minute bucket ${minuteLimit}/min > burst of ${TOTAL} — limiter can't be tripped on this tier; skipping`,
+      );
+      ctx.skip();
+      return;
+    }
+
+    const base = (readEnv("QUIRE_API_SERVER") || "").replace(/\/$/, "");
+    // currentToken() returns the post-refresh access token if any client
+    // method has fired (and the helpers' rawApi above just refreshed via
+    // its warmup). Falls back to the env-file value otherwise.
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${currentToken()}`,
+    };
 
     let triggered: { status: number; headers: Record<string, string> } | null =
       null;

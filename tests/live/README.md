@@ -34,15 +34,24 @@ npm run test:live:prepare
    registered as a redirect URI. (The same app the production caller uses is
    fine — the live tests are scoped to a dedicated test project, not the
    production data.)
-2. A dedicated test project named `Quire_API_Test_Project` in a workspace the
-   authorized user belongs to. Several tests assume specific custom-field
-   definitions live on it:
+2. A dedicated test project in a workspace the authorized user belongs to.
+   The bootstrap script defaults to the slug `Quire_API_Test_Project`; forks
+   need their own slug since Quire project ids are workspace-globally unique
+   — set `QUIRE_TEST_PROJECT_ID=<your-slug>` in the env file *before* running
+   `npm run test:live:prepare` and the bootstrap will pick that one up.
+   Several tests assume specific custom-field definitions live on it:
    - `Cost` (Currency)
    - `Work time` (Duration)
    - `Note` (Paragraph)
-3. (Optional) A second project at `Test_Transfer_Project` in the same workspace
-   for the cross-project transfer tests.
-4. (Optional) Free-plan org / project anchors for the subscription / plan-
+3. (Optional) A second project in the same workspace for the cross-project
+   transfer tests. Set its slug as `QUIRE_TEST_TRANSFER_PROJECT_ID` in the
+   env file. Without it, [task-transfer.live.test.ts](task-transfer.live.test.ts)
+   skips entirely and TMP4 in [task-move-position.live.test.ts](task-move-position.live.test.ts)
+   skips (TMP1–TMP3 still run).
+4. (Optional) Slug of a folder that contains the test project, set as
+   `QUIRE_TEST_FOLDER_ID`. Used by T5b to probe the
+   `/task/search-folder/id/{folderId}` URL form. Without it, T5b skips.
+5. (Optional) Free-plan org / project anchors for the subscription / plan-
    gating tests (`QUIRE_TEST_FREE_ORG_ID`, `QUIRE_TEST_PAID_ORG_ID`,
    `QUIRE_TEST_FREE_PROJECT_ID`).
 
@@ -74,6 +83,12 @@ cat > ~/.config/quire/test-api.env <<'EOF'
 QUIRE_API_SERVER=https://quire.io
 QUIRE_CLIENT_ID=<from your Quire OAuth app>
 QUIRE_CLIENT_SECRET=<from your Quire OAuth app>
+# Optional — override these if your test fixtures aren't named the defaults
+# (Quire project/folder ids are workspace-globally unique, so forks must use
+# their own):
+# QUIRE_TEST_PROJECT_ID=<primary-test-project-slug>
+# QUIRE_TEST_TRANSFER_PROJECT_ID=<secondary-project-slug-for-transfer-tests>
+# QUIRE_TEST_FOLDER_ID=<slug-of-a-folder-containing-the-test-project>
 EOF
 ```
 
@@ -97,8 +112,10 @@ What it does:
 4. POSTs the code to `${QUIRE_API_SERVER}/oauth/token`, gets back
    `access_token` + `refresh_token` + `expires_in`.
 5. Looks up the test project's OID and the workspace OID via
-   `GET /project/id/Quire_API_Test_Project` (a project named exactly that
-   must exist in a workspace the authorizing user belongs to).
+   `GET /project/id/{QUIRE_TEST_PROJECT_ID}` — the slug already in the env
+   file if set, otherwise the default `Quire_API_Test_Project`. A project
+   with that exact slug must exist in a workspace the authorizing user
+   belongs to.
 6. **Writes** the file back in place. Your three input creds are preserved;
    the previous file is backed up to `<file>.bak`.
 
@@ -120,6 +137,12 @@ QUIRE_TEST_EXPIRES_AT=1700000000000
 QUIRE_TEST_PROJECT_ID=Quire_API_Test_Project
 QUIRE_TEST_PROJECT_OID=oid_...
 QUIRE_TEST_ORG_OID=oid_...
+# Optional — slug of a second project for the cross-project transfer tests.
+# Leave blank to skip task-transfer.live.test.ts and TMP4.
+QUIRE_TEST_TRANSFER_PROJECT_ID=
+# Optional — slug of a folder that contains the test project. Leave blank
+# to skip T5b's folder-scoped search probe.
+QUIRE_TEST_FOLDER_ID=
 # Optional — used by subscription.live.test.ts + project.live.test.ts.
 # Leave blank to skip those cases.
 QUIRE_TEST_FREE_ORG_ID=
