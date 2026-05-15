@@ -1870,15 +1870,24 @@ export class QuireClient {
   // -----------------------------------------------------------------------
   // Notifications
   //
-  // POST /notification fires an in-app notification to the *current* user
-  // (the one whose access token is making the call) — not to arbitrary
-  // recipients. Requires the `share` scope (`arNotification` server-side);
-  // calls without it return 403. No response body.
+  // POST /notification fires an in-app notification. Without `recipients`,
+  // the message goes to the *current* user (the one whose access token is
+  // making the call). With `recipients`, the message fans out to colleagues
+  // visible to the app — each entry is a user OID, ID, or email matching
+  // `GET /user/list`. Special value `["*"]` (sole entry) broadcasts to every
+  // visible user; mixing `*` with other entries returns 400. Unknown or
+  // invisible recipients return 404 with an identical response for every
+  // case (the endpoint cannot be used to probe user existence). Rate-limit
+  // cost: every 10 delivered recipients counts as 1 unit (rounded up,
+  // minimum 1) — over-budget calls return 429 with no partial delivery.
+  // Requires the `share` scope (`arNotification` server-side); calls
+  // without it return 403. No response body.
   // -----------------------------------------------------------------------
 
   async sendNotification(body: {
     message: string;
     url?: string;
+    recipients?: string[];
   }): Promise<void> {
     await this.fetch<void>(`/notification`, {
       method: "POST",

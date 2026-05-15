@@ -54,6 +54,12 @@ npm run test:live:prepare
 5. (Optional) Free-plan org / project anchors for the subscription / plan-
    gating tests (`QUIRE_TEST_FREE_ORG_ID`, `QUIRE_TEST_PAID_ORG_ID`,
    `QUIRE_TEST_FREE_PROJECT_ID`).
+6. (Optional) Email of a colleague visible to the OAuth app, set as
+   `QUIRE_TEST_COLLEAGUE_EMAIL`. Used by N4 in
+   [notification.live.test.ts](notification.live.test.ts) to exercise the
+   `recipients` fan-out path. "Visible to the app" means either a same-org
+   colleague who has also authorized this app, or any colleague if the app
+   holds the contacts scope. Without it, N4 skips (N1–N3 and N5 still run).
 
 ## First-time setup
 
@@ -148,6 +154,10 @@ QUIRE_TEST_FOLDER_ID=
 QUIRE_TEST_FREE_ORG_ID=
 QUIRE_TEST_PAID_ORG_ID=
 QUIRE_TEST_FREE_PROJECT_ID=
+# Optional — email of a colleague visible to the OAuth app, used by N4 in
+# notification.live.test.ts to test the `recipients` fan-out path. Leave
+# blank to skip N4.
+QUIRE_TEST_COLLEAGUE_EMAIL=
 ```
 
 ### Step 3 — Run the tests

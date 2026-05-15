@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8 — 2026-05-15
+
+- `sendNotification` now accepts an optional `recipients?: string[]` field, matching the server change shipped 2026-05-15. Each entry is a user OID, ID, or email; the server's eligibility set is the authorizing user plus colleagues visible to the app (per `GET /user/list`). Special value `["*"]` (must be the sole entry) broadcasts to every visible user; mixing `*` with other entries returns 400. Unknown or invisible recipients return 404 with an identical response for every case, so the endpoint can't be used to probe user existence. Rate-limit cost: every 10 delivered recipients counts as 1 unit (rounded up, minimum 1 per call); over-budget calls get 429 with no partial delivery. Omitting `recipients` preserves the previous self-only behavior.
+- No client change for the Storage API rate-limit retiering shipped the same day — Storage endpoints aren't part of this package, but be aware that storage-using callers now share their org's standard per-minute / per-hour bucket instead of a flat 200/min, 3000/hr per-OApp cap.
+
 ## 0.1.7 — 2026-05-11
 
 - Export `QuireMyTasksScope` and `QuireMyTasksFilter` from the package barrel. 0.1.6 added the types to `src/client.ts` but forgot the `src/index.ts` re-export, so `import type { QuireMyTasksScope } from "@quire-io/api-client"` failed with TS2305. 0.1.7 is the first 0.1.x release on npm; 0.1.6 was tagged on GitHub but never published.
