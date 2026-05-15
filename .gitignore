@@ -17,3 +17,8 @@ npm-debug.log*
 
 # coverage
 coverage/
+
+# live-API test env (tokens — never commit)
+tests/live/.env
+tests/live/.env.bak
+

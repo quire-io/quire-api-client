@@ -129,10 +129,22 @@ The logger interface is `{ error, info, debug?, warn? }` — any structural matc
 
 ```bash
 npm install
-npm test            # vitest
+npm test            # offline / mocked unit tests (CI-default)
 npm run typecheck   # tsc --noEmit
 npm run build       # tsc → dist/
 npm run gen-coverage  # regenerate COVERAGE.md from src/client.ts
+```
+
+### Live API tests
+
+A separate, **opt-in** suite under [`tests/live/`](tests/live/) exercises
+`QuireClient` against the real Quire API. It's gated on a configured env
+file (see [tests/live/README.md](tests/live/README.md) for setup) and never
+runs during `npm test`.
+
+```bash
+npm run test:live:prepare   # one-time OAuth bootstrap → writes tokens to ~/.config/quire/test-api.env
+npm run test:live           # run the full live-API suite
 ```
 
 ## License
