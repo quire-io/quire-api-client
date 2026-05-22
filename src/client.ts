@@ -426,8 +426,12 @@ export class QuireClient {
   // Apr 22 2026. Returns per-hour and per-minute API usage buckets for
   // the org; the endpoint itself is free — calling it does not count
   // against either bucket (server invokes skipAppAccessLimit).
+  //
+  // May 22 2026: server renamed the path from `/rate_limit` to
+  // `/rate-limit`. The old underscore form is still accepted (deprecated)
+  // but new clients hit the hyphenated path.
   async getRateLimit(orgOid: string): Promise<QuireRateLimit> {
-    return this.fetch<QuireRateLimit>(`/rate_limit/${orgOid}`);
+    return this.fetch<QuireRateLimit>(`/rate-limit/${orgOid}`);
   }
 
   // PUT /organization accepts `name`, `description`, and follower deltas
@@ -1072,6 +1076,13 @@ export class QuireClient {
   //     destructive-but-quiet ops (remove, move) and as opt-in for ops
   //     where the caller may want to confirm the resulting record (add,
   //     update, transfer, approve).
+  //   - Optional `?dry-run=true` (May 22 2026) runs the full operation
+  //     inside a transaction and rolls back before responding. Validation,
+  //     permission checks, and business rules still execute; the response
+  //     matches the real call's shape so callers can preview what *would*
+  //     happen. A successful dry-run signals that resubmitting without
+  //     `dry-run` is likely to succeed (race conditions and quota
+  //     consumption between calls are not pre-checked).
   //
   // See TBA1 / TBA2 / TBU1 / TBM1 / TBP1 / TBD1 in
   // tests/quire_api/task.test.ts. bulk-transfer relies on the existing
@@ -1086,9 +1097,12 @@ export class QuireClient {
   async bulkCreateTasks(
     projectOid: string,
     items: Array<Record<string, unknown>>,
-    options: { return?: "compact" } = {},
+    options: { return?: "compact"; dryRun?: boolean } = {},
   ): Promise<Array<QuireTask>> {
-    const qs = options.return ? `?return=${options.return}` : "";
+    const params = new URLSearchParams();
+    if (options.return) params.set("return", options.return);
+    if (options.dryRun) params.set("dry-run", "true");
+    const qs = params.toString() ? `?${params.toString()}` : "";
     return this.fetch<Array<QuireTask>>(
       `/task/bulk-add/${projectOid}${qs}`,
       { method: "POST", body: JSON.stringify(items) },
@@ -1104,11 +1118,13 @@ export class QuireClient {
     options: {
       position?: "parent" | "before" | "after";
       return?: "compact";
+      dryRun?: boolean;
     } = {},
   ): Promise<Array<QuireTask>> {
     const qs = new URLSearchParams();
     if (options.position) qs.set("position", options.position);
     if (options.return) qs.set("return", options.return);
+    if (options.dryRun) qs.set("dry-run", "true");
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return this.fetch<Array<QuireTask>>(
       `/task/bulk-add/${parentOid}${suffix}`,
@@ -1122,9 +1138,12 @@ export class QuireClient {
   async bulkUpdateTasks(
     projectOid: string,
     items: Array<Record<string, unknown>>,
-    options: { return?: "compact" } = {},
+    options: { return?: "compact"; dryRun?: boolean } = {},
   ): Promise<Array<QuireTask | null>> {
-    const qs = options.return ? `?return=${options.return}` : "";
+    const params = new URLSearchParams();
+    if (options.return) params.set("return", options.return);
+    if (options.dryRun) params.set("dry-run", "true");
+    const qs = params.toString() ? `?${params.toString()}` : "";
     return this.fetch<Array<QuireTask | null>>(
       `/task/bulk-update/${projectOid}${qs}`,
       { method: "PUT", body: JSON.stringify(items) },
@@ -1138,10 +1157,13 @@ export class QuireClient {
   async bulkRemoveTasks(
     projectOid: string,
     refs: Array<string | number>,
-    options: { return?: "compact" | "full" } = {},
+    options: { return?: "compact" | "full"; dryRun?: boolean } = {},
   ): Promise<Array<{ oid: string; id?: number } | QuireTask | null>> {
     const ret = options.return ?? "compact";
-    const qs = ret === "full" ? "" : `?return=${ret}`;
+    const params = new URLSearchParams();
+    if (ret !== "full") params.set("return", ret);
+    if (options.dryRun) params.set("dry-run", "true");
+    const qs = params.toString() ? `?${params.toString()}` : "";
     return this.fetch(
       `/task/bulk-remove/${projectOid}${qs}`,
       { method: "DELETE", body: JSON.stringify(refs) },
@@ -1157,12 +1179,14 @@ export class QuireClient {
       task: string | "root";
       position?: "parent" | "before" | "after";
       return?: "compact" | "full";
+      dryRun?: boolean;
     },
   ): Promise<Array<{ oid: string; id?: number } | QuireTask>> {
     const ret = options.return ?? "compact";
     const qs = new URLSearchParams({ task: String(options.task) });
     if (options.position) qs.set("position", options.position);
     if (ret !== "full") qs.set("return", ret);
+    if (options.dryRun) qs.set("dry-run", "true");
     return this.fetch(
       `/task/bulk-move/${projectOid}?${qs.toString()}`,
       { method: "PUT", body: JSON.stringify(refs) },
@@ -1183,6 +1207,7 @@ export class QuireClient {
       status?: boolean;
       customField?: boolean;
       return?: "compact" | "full";
+      dryRun?: boolean;
     },
   ): Promise<Array<{ oid: string; id?: number } | QuireTask>> {
     const ret = options.return ?? "compact";
@@ -1194,6 +1219,7 @@ export class QuireClient {
     if (options.status !== undefined) qs.set("status", options.status ? "true" : "false");
     if (options.customField !== undefined) qs.set("custom-field", options.customField ? "true" : "false");
     if (ret !== "full") qs.set("return", ret);
+    if (options.dryRun) qs.set("dry-run", "true");
     return this.fetch(
       `/task/bulk-transfer/${sourceProjectOid}?${qs.toString()}`,
       { method: "PUT", body: JSON.stringify(refs) },
@@ -1210,11 +1236,13 @@ export class QuireClient {
       state: "request" | "approve" | "reject" | "change";
       category?: string;
       return?: "compact" | "full";
+      dryRun?: boolean;
     },
   ): Promise<Array<{ oid: string; id?: number } | QuireApproval>> {
     const qs = new URLSearchParams({ state: options.state });
     if (options.category !== undefined) qs.set("category", options.category);
     if (options.return) qs.set("return", options.return);
+    if (options.dryRun) qs.set("dry-run", "true");
     return this.fetch(
       `/task/bulk-approve/${projectOid}?${qs.toString()}`,
       { method: "POST", body: JSON.stringify(refs) },

@@ -227,4 +227,90 @@ describe.skipIf(!hasTokens)("Live API — bulk task endpoints", () => {
       expect(get.status).toBe(404);
     }
   });
+
+  // dry-run rolls back inside a transaction (May 22 2026). The response
+  // mirrors the real call's shape but no DB changes persist. Each test
+  // verifies (a) the response shape, (b) absence of the side effect.
+
+  it("TBDRY1 bulkCreateTasks dry-run returns compact rows but persists nothing", async () => {
+    const items = [
+      { name: `${runTag}-tbdry1-a` },
+      { name: `${runTag}-tbdry1-b` },
+    ];
+    const previewed = (await client.bulkCreateTasks(PROJECT_OID, items, {
+      return: "compact",
+      dryRun: true,
+    })) as unknown as CompactTask[];
+    // Server still validates and shapes the response.
+    expect(previewed).toHaveLength(2);
+    for (const t of previewed) {
+      // Server may either omit the oid or hand back a synthetic placeholder
+      // — either way, none of the previewed oids should resolve via GET.
+      if (t?.oid) {
+        const get = await rawApi("GET", `/task/${t.oid}`);
+        expect(get.status).toBe(404);
+      }
+    }
+    // Nothing matching the names should exist in the project either.
+    const list = await client.listTasks(PROJECT_OID);
+    for (const name of items.map((i) => i.name)) {
+      expect(list.some((t) => t.name === name)).toBe(false);
+    }
+  });
+
+  it("TBDRY2 bulkUpdateTasks dry-run shapes the response but leaves fields untouched", async () => {
+    const a = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-tbdry2-a`,
+    });
+    const b = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-tbdry2-b`,
+    });
+    try {
+      const items = [
+        { oid: a.oid, name: `${runTag}-tbdry2-a-WOULD-UPDATE`, priority: "High" },
+        { oid: b.oid, description: "would-add-body" },
+      ];
+      const previewed = (await client.bulkUpdateTasks(PROJECT_OID, items, {
+        return: "compact",
+        dryRun: true,
+      })) as unknown as CompactTask[];
+      expect(previewed).toHaveLength(2);
+
+      // Rollback check — the original values should still be present.
+      const aAfter = await client.getTask(a.oid);
+      expect(aAfter.name).toBe(`${runTag}-tbdry2-a`);
+      expect(aAfter.priority?.name ?? "").not.toBe("High");
+      const bAfter = await client.getTask(b.oid);
+      expect((bAfter.descriptionText ?? bAfter.description ?? "")).not.toContain(
+        "would-add-body",
+      );
+    } finally {
+      await client.bulkRemoveTasks(PROJECT_OID, [a.oid, b.oid]);
+    }
+  });
+
+  it("TBDRY3 bulkRemoveTasks dry-run reports the planned removal but tasks survive", async () => {
+    const a = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-tbdry3-a`,
+    });
+    const b = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-tbdry3-b`,
+    });
+    try {
+      const previewed = await client.bulkRemoveTasks(
+        PROJECT_OID,
+        [a.oid, b.oid],
+        { dryRun: true },
+      );
+      expect(previewed).toHaveLength(2);
+
+      // Both tasks should still be fetchable.
+      for (const oid of [a.oid, b.oid]) {
+        const get = await rawApi("GET", `/task/${oid}`);
+        expect(get.status).toBe(200);
+      }
+    } finally {
+      await client.bulkRemoveTasks(PROJECT_OID, [a.oid, b.oid]);
+    }
+  });
 });

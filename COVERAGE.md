@@ -21,7 +21,7 @@ Generated from 110 client methods covering 116 endpoints across 23 sections.
 | `listOrganizations` | `GET` | `/api/organization/list` |
 | `getOrganizationById` | `GET` | `/api/organization/id/{orgId}` |
 | `getOrganization` | `GET` | `/api/organization/{orgOid}` |
-| `getRateLimit` | `GET` | `/api/rate_limit/{orgOid}` |
+| `getRateLimit` | `GET` | `/api/rate-limit/{orgOid}` |
 | `updateOrganization` | `PUT` | `/api/organization/{orgOid}` |
 
 ## Projects

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9 — 2026-05-22
+
+- Bulk task endpoints accept a new `dryRun?: boolean` option — `bulkCreateTasks`, `bulkCreateSubtasks`, `bulkUpdateTasks`, `bulkRemoveTasks`, `bulkMoveTasks`, `bulkTransferTasks`, `bulkApproveTasks`. Forwarded as `?dry-run=true`. The server runs the full operation in a transaction (auth, permission, FK, business rules) and rolls back before responding, so the result payload mirrors the real call's shape — a successful dry-run signals that resubmitting without the flag is likely to succeed. Race conditions and quota consumption between calls aren't pre-checked. Per-item rate-limit cost still applies to dry-runs.
+- `getRateLimit` now hits the renamed `/rate-limit/{orgOid}` path. The underscore form (`/rate_limit`) is deprecated server-side but still accepted, so older clients keep working — bump to 0.1.9 to track the canonical URL.
+- No client change for the Storage API rate-limit retiering shipped the same day; Storage endpoints aren't part of this package.
+
 ## 0.1.8 — 2026-05-15
 
 - `sendNotification` now accepts an optional `recipients?: string[]` field, matching the server change shipped 2026-05-15. Each entry is a user OID, ID, or email; the server's eligibility set is the authorizing user plus colleagues visible to the app (per `GET /user/list`). Special value `["*"]` (must be the sole entry) broadcasts to every visible user; mixing `*` with other entries returns 400. Unknown or invisible recipients return 404 with an identical response for every case, so the endpoint can't be used to probe user existence. Rate-limit cost: every 10 delivered recipients counts as 1 unit (rounded up, minimum 1 per call); over-budget calls get 429 with no partial delivery. Omitting `recipients` preserves the previous self-only behavior.

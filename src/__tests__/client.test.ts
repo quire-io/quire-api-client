@@ -347,3 +347,156 @@ describe("getMyTasks scope routing", () => {
     }
   });
 });
+
+describe("bulk endpoints accept dry-run (May 22 2026)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  it("bulkCreateTasks omits dry-run by default", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkCreateTasks("oid-p1", [{ name: "x" }]);
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toBe("https://quire.io/api/task/bulk-add/oid-p1");
+  });
+
+  it("bulkCreateTasks appends dry-run=true when requested", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkCreateTasks("oid-p1", [{ name: "x" }], {
+      dryRun: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("dry-run=true");
+  });
+
+  it("bulkCreateTasks composes return=compact with dry-run", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkCreateTasks("oid-p1", [{ name: "x" }], {
+      return: "compact",
+      dryRun: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("return=compact");
+    expect(url).toContain("dry-run=true");
+  });
+
+  it("bulkCreateSubtasks composes position + dry-run", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkCreateSubtasks("oid-t1", [{ name: "x" }], {
+      position: "before",
+      dryRun: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("position=before");
+    expect(url).toContain("dry-run=true");
+  });
+
+  it("bulkUpdateTasks appends dry-run=true", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkUpdateTasks("oid-p1", [{ oid: "oid-t1", name: "x" }], {
+      dryRun: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("dry-run=true");
+  });
+
+  it("bulkRemoveTasks appends dry-run=true alongside default return=compact", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkRemoveTasks("oid-p1", ["oid-t1"], { dryRun: true });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("return=compact");
+    expect(url).toContain("dry-run=true");
+  });
+
+  it("bulkRemoveTasks with return=full omits the return param but keeps dry-run", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkRemoveTasks("oid-p1", ["oid-t1"], {
+      return: "full",
+      dryRun: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).not.toContain("return=");
+    expect(url).toContain("dry-run=true");
+  });
+
+  it("bulkMoveTasks appends dry-run after the required task ref", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkMoveTasks("oid-p1", ["oid-t1"], {
+      task: "root",
+      dryRun: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("task=root");
+    expect(url).toContain("dry-run=true");
+  });
+
+  it("bulkTransferTasks appends dry-run with per-aspect remap flags", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkTransferTasks("oid-src", ["oid-t1"], {
+      project: "oid-dst",
+      tag: false,
+      dryRun: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("project=oid-dst");
+    expect(url).toContain("tag=false");
+    expect(url).toContain("dry-run=true");
+  });
+
+  it("bulkApproveTasks appends dry-run alongside state", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkApproveTasks("oid-p1", ["oid-t1"], {
+      state: "approve",
+      dryRun: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("state=approve");
+    expect(url).toContain("dry-run=true");
+  });
+
+  it("dryRun: false (or omitted) does not emit the param", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().bulkApproveTasks("oid-p1", ["oid-t1"], {
+      state: "approve",
+      dryRun: false,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).not.toContain("dry-run");
+  });
+});
+
+describe("getRateLimit hits the hyphenated path (May 22 2026)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  it("calls /rate-limit/{orgOid}, not the deprecated /rate_limit form", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ minute: {}, hour: {} }));
+    await mkClient().getRateLimit("oid-org");
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      "https://quire.io/api/rate-limit/oid-org",
+    );
+  });
+});
