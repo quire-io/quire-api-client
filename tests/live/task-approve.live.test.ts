@@ -115,18 +115,20 @@ describe.skipIf(!hasTokens)("Live API — /task/approve + /revoke-approval", () 
     await client.revokeTaskApproval(taskOid);
   });
 
-  // Compact return form isn't exposed on `approveTask` — drop to rawApi to
-  // verify the {oid, id} response shape.
-  it("TA6 POST /task/approve?return=compact returns {oid, id}", async () => {
-    const res = await rawApi<{ oid: string; id: number }>(
-      "POST",
-      `/task/approve/${taskOid}?state=request&return=compact`,
-    );
-    expect(res.status).toBe(200);
-    expect(res.data.oid).toBe(taskOid);
-    expect(res.data.id).toBe(taskId);
-    expect((res.data as Record<string, unknown>).state).toBeUndefined();
-    expect((res.data as Record<string, unknown>).category).toBeUndefined();
+  // Compact return form on /task/approve: client now exposes it via
+  // `approveTask(..., { compact: true })`. The compact path returns
+  // {oid, id} of the **task** (not the approval) — verified against
+  // approval_api.dart, which calls `compactResponse(oidTask, task.id)`.
+  it("TA6 approveTask({state:'request',compact:true}) returns {oid, id}", async () => {
+    const res = await client.approveTask(taskOid, {
+      state: "request",
+      compact: true,
+    });
+    expect(res.oid).toBe(taskOid);
+    expect(res.id).toBe(taskId);
+    // No Approval-shape fields leak into compact response.
+    expect((res as Record<string, unknown>).state).toBeUndefined();
+    expect((res as Record<string, unknown>).category).toBeUndefined();
 
     // Tear back down so afterAll's DELETE doesn't trip on a half-state.
     await client.revokeTaskApproval(taskOid);

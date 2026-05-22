@@ -63,6 +63,34 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
     expect(c.descriptionText ?? c.description).toContain("edited");
   });
 
+  // ?return=compact on /comment endpoints. Comments don't carry a numeric
+  // id, so the compact response is just `{oid}` — verify and confirm the
+  // server's full-record render fields are absent.
+  it("C3b addComment + updateComment honour compact (no id, no render fields)", async () => {
+    const created = await client.addComment(
+      taskOid!,
+      `${runTag}-compact`,
+      { compact: true },
+    );
+    expect(typeof created.oid).toBe("string");
+    expect(created.id).toBeUndefined();
+    expect((created as Record<string, unknown>).description).toBeUndefined();
+    expect((created as Record<string, unknown>).descriptionText).toBeUndefined();
+
+    const updated = await client.updateComment(created.oid, {
+      description: `${runTag}-compact-edited`,
+      compact: true,
+    });
+    expect(updated.oid).toBe(created.oid);
+    expect((updated as Record<string, unknown>).description).toBeUndefined();
+
+    // The update actually persisted — full GET shows the edited text.
+    const got = await client.getComment(created.oid);
+    expect(got.descriptionText ?? got.description).toContain("compact-edited");
+
+    await client.deleteComment(created.oid);
+  });
+
   it("C4 deleteComment removes it and a subsequent GET returns 404", async () => {
     await client.deleteComment(commentOid!);
     const get = await rawApi("GET", `/comment/${commentOid}`);

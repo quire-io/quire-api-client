@@ -31,6 +31,22 @@ export interface QuireEnumValue {
   name: string;
 }
 
+/**
+ * The compact response shape returned by `?return=compact` on single-resource
+ * write endpoints (create / update / move / transfer / approve, plus a few
+ * extension endpoints). Identifiers only — `oid` always, plus `id` when the
+ * entity has an integer id (tasks, projects, status values, …). Comments
+ * have no integer id, so callers should treat `id` as optional.
+ *
+ * Opting into compact skips the server's post-write reload + render, which
+ * is the real performance win on top of the smaller payload — useful for
+ * agent / bulk workflows that only need the OID to chain follow-up calls.
+ */
+export interface QuireCompactRef {
+  oid: string;
+  id?: number;
+}
+
 // ---------------------------------------------------------------------------
 // User
 // ---------------------------------------------------------------------------

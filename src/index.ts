@@ -53,6 +53,7 @@ export type {
   QuireAttachment,
   QuireChat,
   QuireComment,
+  QuireCompactRef,
   QuireDocument,
   QuireEnumValue,
   QuireFieldDefinition,

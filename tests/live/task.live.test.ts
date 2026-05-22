@@ -337,6 +337,71 @@ describe.skipIf(!hasTokens)("Quire API — /task", () => {
     await client.deleteTask(oid);
   });
 
+  // ?return=compact on single-resource writes (May 22 2026). The server
+  // skips the post-write reload + render and returns just `{oid, id}` —
+  // verify the wire shape, that no full-record fields slip through, and
+  // that the write itself still happened.
+  it("TCMP1 createTask({compact:true}) returns {oid,id} only and task is real", async () => {
+    const res = await client.createTask(
+      PROJECT_OID,
+      { name: `${runTag}-tcmp1` },
+      { compact: true },
+    );
+    expect(typeof res.oid).toBe("string");
+    expect(typeof res.id).toBe("number");
+    // No full-record fields leak into the compact response.
+    expect((res as Record<string, unknown>).name).toBeUndefined();
+    expect((res as Record<string, unknown>).status).toBeUndefined();
+    // The task was actually created — GET round-trips it.
+    const got = await client.getTask(res.oid);
+    expect(got.nameText ?? got.name).toBe(`${runTag}-tcmp1`);
+    await client.deleteTask(res.oid);
+  });
+
+  it("TCMP2 updateTask({compact:true}) returns {oid,id} and persists the update", async () => {
+    const created = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-tcmp2-orig`,
+    });
+    try {
+      const res = await client.updateTask(
+        created.oid,
+        { name: `${runTag}-tcmp2-renamed`, priority: "High" },
+        { compact: true },
+      );
+      expect(res.oid).toBe(created.oid);
+      expect(typeof res.id).toBe("number");
+      expect((res as Record<string, unknown>).name).toBeUndefined();
+      const got = await client.getTask(created.oid);
+      expect(got.nameText ?? got.name).toBe(`${runTag}-tcmp2-renamed`);
+      expect(got.priority?.name).toBe("High");
+    } finally {
+      await client.deleteTask(created.oid);
+    }
+  });
+
+  it("TCMP3 moveTask({compact:true}) returns {oid,id} and reparents", async () => {
+    const anchor = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-tcmp3-anchor`,
+    });
+    const child = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-tcmp3-child`,
+    });
+    try {
+      const res = await client.moveTask(child.oid, anchor.oid, "parent", {
+        compact: true,
+      });
+      expect(res.oid).toBe(child.oid);
+      expect(typeof res.id).toBe("number");
+      expect((res as Record<string, unknown>).name).toBeUndefined();
+      // The move actually happened.
+      const subs = await client.listSubtasks(anchor.oid);
+      expect(subs.some((t) => t.oid === child.oid)).toBe(true);
+    } finally {
+      // Cascade-remove via the anchor (covers both).
+      await client.deleteTask(anchor.oid).catch(() => {});
+    }
+  });
+
   // Cascade check — deleting a parent removes subtasks, so undo-remove on
   // the parent should also bring the subtree back. Locks down the expected
   // behavior so any future divergence surfaces as a test failure.

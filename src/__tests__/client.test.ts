@@ -476,6 +476,161 @@ describe("bulk endpoints accept dry-run (May 22 2026)", () => {
   });
 });
 
+describe("single-resource writes accept ?return=compact (May 22 2026)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  it("createTask omits the return param by default", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "t1" }));
+    await mkClient().createTask("oid-p1", { name: "x" });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toBe("https://quire.io/api/task/oid-p1");
+  });
+
+  it("createTask appends return=compact when compact: true", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "t1", id: 1 }));
+    await mkClient().createTask("oid-p1", { name: "x" }, { compact: true });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toBe("https://quire.io/api/task/oid-p1?return=compact");
+  });
+
+  it("createSubtask appends return=compact when compact: true", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "t1", id: 1 }));
+    await mkClient().createSubtask("oid-parent", { name: "x" }, { compact: true });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("return=compact");
+  });
+
+  it("createTaskRelative composes position + return=compact", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "t1", id: 1 }));
+    await mkClient().createTaskRelative(
+      "oid-sib",
+      { name: "x" },
+      "after",
+      { compact: true },
+    );
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("position=after");
+    expect(url).toContain("return=compact");
+  });
+
+  it("updateTask appends return=compact when compact: true", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "t1", id: 1 }));
+    await mkClient().updateTask("oid-t1", { name: "new" }, { compact: true });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toBe("https://quire.io/api/task/oid-t1?return=compact");
+  });
+
+  it("moveTask composes task + position + return=compact", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "t1", id: 1 }));
+    await mkClient().moveTask("oid-t1", "oid-anchor", "before", { compact: true });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("task=oid-anchor");
+    expect(url).toContain("position=before");
+    expect(url).toContain("return=compact");
+  });
+
+  it("transferTask threads compact through the params bag", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "t1", id: 1 }));
+    await mkClient().transferTask("oid-t1", {
+      project: "oid-dst",
+      tag: false,
+      compact: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("project=oid-dst");
+    expect(url).toContain("tag=false");
+    expect(url).toContain("return=compact");
+  });
+
+  it("approveTask threads compact through the body bag", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "t1", id: 1 }));
+    await mkClient().approveTask("oid-t1", {
+      state: "approve",
+      compact: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toContain("state=approve");
+    expect(url).toContain("return=compact");
+    // Confirm `compact` is NOT echoed into the request body (it's a wire-
+    // level query-string control, not a server-side field).
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(init.body ?? "").not.toContain("compact");
+  });
+
+  it("addComment appends return=compact via options", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "c1" }));
+    await mkClient().addComment("oid-t1", "hi", { compact: true });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toBe("https://quire.io/api/comment/oid-t1?return=compact");
+  });
+
+  it("addChatComment strips compact from the body before sending", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "c1" }));
+    await mkClient().addChatComment("oid-chat", {
+      description: "hi",
+      pinned: true,
+      compact: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toBe("https://quire.io/api/comment/chat/oid-chat?return=compact");
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    const sent = JSON.parse(init.body as string);
+    expect(sent).toEqual({ description: "hi", pinned: true });
+    expect(sent.compact).toBeUndefined();
+  });
+
+  it("updateComment strips compact from the body before sending", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "c1" }));
+    await mkClient().updateComment("oid-c1", {
+      description: "edited",
+      compact: true,
+    });
+    const url = fetchMock.mock.calls[0]![0] as string;
+    expect(url).toBe("https://quire.io/api/comment/oid-c1?return=compact");
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    const sent = JSON.parse(init.body as string);
+    expect(sent.compact).toBeUndefined();
+  });
+
+  // Type-narrowing assertions. These are checked at compile time by tsc
+  // (which runs as part of `npm run typecheck` and the prepublishOnly hook);
+  // the runtime body is a no-op since the conditional generic only matters
+  // at the type layer.
+  it("const-generic narrows the return type from compact literal", async () => {
+    // Each fetch call needs a fresh Response — bodies can only be consumed once.
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(jsonResponse({ oid: "t1", id: 1, name: "x" })),
+    );
+    const c = mkClient();
+    const full = await c.createTask("p", { name: "x" });
+    const _fullName: string = full.name; // QuireTask path
+
+    const compact = await c.createTask("p", { name: "x" }, { compact: true });
+    const _compactOid: string = compact.oid; // QuireCompactRef path
+    // @ts-expect-error — QuireCompactRef has no `name`
+    const _compactName: string = compact.name;
+
+    const explicit = await c.createTask("p", { name: "x" }, { compact: false });
+    const _explicitName: string = explicit.name; // still QuireTask
+    void _fullName;
+    void _compactOid;
+    void _explicitName;
+  });
+});
+
 describe("getRateLimit hits the hyphenated path (May 22 2026)", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 

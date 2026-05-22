@@ -19,6 +19,7 @@ import type {
   QuireApprovalCategory,
   QuireAttachment,
   QuireComment,
+  QuireCompactRef,
   QuireFieldDefinition,
   QuireInsight,
   QuireOrganization,
@@ -842,7 +843,12 @@ export class QuireClient {
   // Tasks (create, update, move, transfer)
   // -----------------------------------------------------------------------
 
-  async createTask(
+  // `?return=compact` (May 22 2026) skips the server's post-write reload +
+  // render and returns just `{oid, id}` — meaningful network + CPU win for
+  // agents that only need the id to chain a follow-up call. The const-
+  // generic lets TS narrow the return type from the literal `compact: true`
+  // / `compact: false` at the call site without overloads.
+  async createTask<const Compact extends boolean = false>(
     projectOid: string,
     body: {
       name: string;
@@ -865,14 +871,16 @@ export class QuireClient {
       // top-level body keys by flattenCustomFields — same shape as updateTask.
       customFields?: Record<string, unknown>;
     },
-  ): Promise<QuireTask> {
-    return this.fetch<QuireTask>(`/task/${projectOid}`, {
+    options?: { compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireTask> {
+    const qs = options?.compact ? "?return=compact" : "";
+    return this.fetch(`/task/${projectOid}${qs}`, {
       method: "POST",
       body: JSON.stringify(flattenCustomFields(body)),
-    });
+    }) as Promise<Compact extends true ? QuireCompactRef : QuireTask>;
   }
 
-  async createSubtask(
+  async createSubtask<const Compact extends boolean = false>(
     parentTaskOid: string,
     body: {
       name: string;
@@ -888,11 +896,13 @@ export class QuireClient {
       recurrence?: QuireRecurrence;
       customFields?: Record<string, unknown>;
     },
-  ): Promise<QuireTask> {
-    return this.fetch<QuireTask>(`/task/${parentTaskOid}`, {
+    options?: { compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireTask> {
+    const qs = options?.compact ? "?return=compact" : "";
+    return this.fetch(`/task/${parentTaskOid}${qs}`, {
       method: "POST",
       body: JSON.stringify(flattenCustomFields(body)),
-    });
+    }) as Promise<Compact extends true ? QuireCompactRef : QuireTask>;
   }
 
   // Create a task positioned relative to an existing sibling. Quire derives
@@ -900,7 +910,7 @@ export class QuireClient {
   // the sibling OID, so this single endpoint covers both root siblings and
   // subtask siblings. Verified against TPos1-TPos3 in
   // tests/quire_api/task.test.ts.
-  async createTaskRelative(
+  async createTaskRelative<const Compact extends boolean = false>(
     siblingTaskOid: string,
     body: {
       name: string;
@@ -917,17 +927,20 @@ export class QuireClient {
       customFields?: Record<string, unknown>;
     },
     position: "before" | "after",
-  ): Promise<QuireTask> {
-    return this.fetch<QuireTask>(
-      `/task/${siblingTaskOid}?position=${encodeURIComponent(position)}`,
+    options?: { compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireTask> {
+    const qs = new URLSearchParams({ position });
+    if (options?.compact) qs.set("return", "compact");
+    return this.fetch(
+      `/task/${siblingTaskOid}?${qs.toString()}`,
       {
         method: "POST",
         body: JSON.stringify(flattenCustomFields(body)),
       },
-    );
+    ) as Promise<Compact extends true ? QuireCompactRef : QuireTask>;
   }
 
-  async updateTask(
+  async updateTask<const Compact extends boolean = false>(
     taskOid: string,
     body: {
       name?: string;
@@ -979,11 +992,13 @@ export class QuireClient {
       // wire format. See https://quire.io/dev/api/ → Update task.
       customFields?: Record<string, unknown>;
     },
-  ): Promise<QuireTask> {
-    return this.fetch<QuireTask>(`/task/${taskOid}`, {
+    options?: { compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireTask> {
+    const qs = options?.compact ? "?return=compact" : "";
+    return this.fetch(`/task/${taskOid}${qs}`, {
       method: "PUT",
       body: JSON.stringify(flattenCustomFields(body)),
-    });
+    }) as Promise<Compact extends true ? QuireCompactRef : QuireTask>;
   }
 
   // Reparent a task within its project. Quire's PUT /task/move/{oid} takes
@@ -1000,18 +1015,20 @@ export class QuireClient {
   // matches the pre-Apr-27 behavior. `before` / `after` require a real
   // task in `parentOid` (not "root", not omitted). See TMP1–TMP4 in
   // tests/quire_api/task.test.ts.
-  async moveTask(
+  async moveTask<const Compact extends boolean = false>(
     taskOid: string,
     parentOid?: string,
     position?: "parent" | "before" | "after",
-  ): Promise<QuireTask> {
+    options?: { compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireTask> {
     const target = parentOid && parentOid.length > 0 ? parentOid : "root";
     const qs: string[] = [`task=${encodeURIComponent(target)}`];
     if (position) qs.push(`position=${position}`);
-    return this.fetch<QuireTask>(
+    if (options?.compact) qs.push("return=compact");
+    return this.fetch(
       `/task/move/${taskOid}?${qs.join("&")}`,
       { method: "PUT" },
-    );
+    ) as Promise<Compact extends true ? QuireCompactRef : QuireTask>;
   }
 
   // Cross-project move. All params are query-string, not body — see TT1 in
@@ -1025,7 +1042,7 @@ export class QuireClient {
   // `before` / `after` make the transferred task a sibling of `task=`
   // (under its parent in the target project). See TMP4 in
   // tests/quire_api/task.test.ts.
-  async transferTask(
+  async transferTask<const Compact extends boolean = false>(
     taskOid: string,
     params: {
       project: string;
@@ -1035,8 +1052,9 @@ export class QuireClient {
       tag?: boolean;
       status?: boolean;
       customField?: boolean;
+      compact?: Compact;
     },
-  ): Promise<QuireTask> {
+  ): Promise<Compact extends true ? QuireCompactRef : QuireTask> {
     const qs: string[] = [`project=${encodeURIComponent(params.project)}`];
     if (params.task !== undefined) qs.push(`task=${encodeURIComponent(params.task)}`);
     if (params.position) qs.push(`position=${params.position}`);
@@ -1044,9 +1062,10 @@ export class QuireClient {
     if (params.tag !== undefined) qs.push(`tag=${params.tag ? "true" : "false"}`);
     if (params.status !== undefined) qs.push(`status=${params.status ? "true" : "false"}`);
     if (params.customField !== undefined) qs.push(`custom-field=${params.customField ? "true" : "false"}`);
-    return this.fetch<QuireTask>(`/task/transfer/${taskOid}?${qs.join("&")}`, {
+    if (params.compact) qs.push("return=compact");
+    return this.fetch(`/task/transfer/${taskOid}?${qs.join("&")}`, {
       method: "PUT",
-    });
+    }) as Promise<Compact extends true ? QuireCompactRef : QuireTask>;
   }
 
   async completeTask(taskOid: string): Promise<QuireTask> {
@@ -1399,19 +1418,25 @@ export class QuireClient {
   // approval. See TA1–TA6 in tests/quire_api/task.test.ts.
   // -----------------------------------------------------------------------
 
-  async approveTask(
+  // `?return=compact` here returns `{oid, id}` of the **task** (not the
+  // approval) — the server uses this shape to short-circuit the post-write
+  // approval reload + render. Verified against approval_api.dart: compact
+  // path returns `compactResponse(oidTask, task.id)`.
+  async approveTask<const Compact extends boolean = false>(
     taskOid: string,
     body: {
       state: "request" | "approve" | "reject" | "change";
       category?: string;
+      compact?: Compact;
     },
-  ): Promise<QuireApproval> {
+  ): Promise<Compact extends true ? QuireCompactRef : QuireApproval> {
     const qs = new URLSearchParams({ state: body.state });
     if (body.category !== undefined) qs.set("category", body.category);
-    return this.fetch<QuireApproval>(
+    if (body.compact) qs.set("return", "compact");
+    return this.fetch(
       `/task/approve/${taskOid}?${qs.toString()}`,
       { method: "POST" },
-    );
+    ) as Promise<Compact extends true ? QuireCompactRef : QuireApproval>;
   }
 
   async revokeTaskApproval(taskOid: string): Promise<void> {
@@ -1536,31 +1561,40 @@ export class QuireClient {
     return this.fetch<QuireComment>(`/comment/${commentOid}`);
   }
 
-  async addComment(taskOid: string, text: string): Promise<QuireComment> {
-    return this.fetch<QuireComment>(`/comment/${taskOid}`, {
+  async addComment<const Compact extends boolean = false>(
+    taskOid: string,
+    text: string,
+    options?: { compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireComment> {
+    const qs = options?.compact ? "?return=compact" : "";
+    return this.fetch(`/comment/${taskOid}${qs}`, {
       method: "POST",
       body: JSON.stringify({ description: text }),
-    });
+    }) as Promise<Compact extends true ? QuireCompactRef : QuireComment>;
   }
 
-  async addChatComment(
+  async addChatComment<const Compact extends boolean = false>(
     chatOid: string,
-    body: { description: string; pinned?: boolean },
-  ): Promise<QuireComment> {
-    return this.fetch<QuireComment>(`/comment/chat/${chatOid}`, {
+    body: { description: string; pinned?: boolean; compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireComment> {
+    const { compact, ...wire } = body;
+    const qs = compact ? "?return=compact" : "";
+    return this.fetch(`/comment/chat/${chatOid}${qs}`, {
       method: "POST",
-      body: JSON.stringify(body),
-    });
+      body: JSON.stringify(wire),
+    }) as Promise<Compact extends true ? QuireCompactRef : QuireComment>;
   }
 
-  async updateComment(
+  async updateComment<const Compact extends boolean = false>(
     commentOid: string,
-    body: { description?: string; pinned?: boolean },
-  ): Promise<QuireComment> {
-    return this.fetch<QuireComment>(`/comment/${commentOid}`, {
+    body: { description?: string; pinned?: boolean; compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireComment> {
+    const { compact, ...wire } = body;
+    const qs = compact ? "?return=compact" : "";
+    return this.fetch(`/comment/${commentOid}${qs}`, {
       method: "PUT",
-      body: JSON.stringify(body),
-    });
+      body: JSON.stringify(wire),
+    }) as Promise<Compact extends true ? QuireCompactRef : QuireComment>;
   }
 
   async deleteComment(commentOid: string): Promise<void> {

@@ -84,10 +84,10 @@ Generated from 110 client methods covering 116 endpoints across 23 sections.
 
 | Method | HTTP | Endpoint |
 |---|---|---|
-| `createTask` | `POST` | `/api/task/{projectOid}` |
-| `createSubtask` | `POST` | `/api/task/{parentTaskOid}` |
-| `createTaskRelative` | `POST` | `/api/task/{siblingTaskOid}?position={position}` |
-| `updateTask` | `PUT` | `/api/task/{taskOid}` |
+| `createTask` | `POST` | `/api/task/{projectOid}[?…]` |
+| `createSubtask` | `POST` | `/api/task/{parentTaskOid}[?…]` |
+| `createTaskRelative` | `POST` | `/api/task/{siblingTaskOid}?…` |
+| `updateTask` | `PUT` | `/api/task/{taskOid}[?…]` |
 | `moveTask` | `PUT` | `/api/task/move/{taskOid}?…` |
 | `transferTask` | `PUT` | `/api/task/transfer/{taskOid}?…` |
 | `completeTask` | `PUT` | `/api/task/{taskOid}` |
@@ -156,9 +156,9 @@ Generated from 110 client methods covering 116 endpoints across 23 sections.
 |---|---|---|
 | `getTaskComments` | `GET` | `/api/comment/list/{taskOid}` |
 | `getComment` | `GET` | `/api/comment/{commentOid}` |
-| `addComment` | `POST` | `/api/comment/{taskOid}` |
-| `addChatComment` | `POST` | `/api/comment/chat/{chatOid}` |
-| `updateComment` | `PUT` | `/api/comment/{commentOid}` |
+| `addComment` | `POST` | `/api/comment/{taskOid}[?…]` |
+| `addChatComment` | `POST` | `/api/comment/chat/{chatOid}[?…]` |
+| `updateComment` | `PUT` | `/api/comment/{commentOid}[?…]` |
 | `deleteComment` | `DELETE` | `/api/comment/{commentOid}` |
 | `undoRemoveComment` | `PUT` | `/api/comment/undo-remove/{commentOid}` |
 

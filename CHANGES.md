@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.10 — 2026-05-22
+
+- Single-resource write methods on the hot path accept an optional `compact?: boolean`. When true the client appends `?return=compact`; the server skips its post-write reload + render and returns just `{oid, id}` — meaningful network + CPU win for agent / bulk workflows that only need the OID to chain a follow-up call. Methods covered: `createTask`, `createSubtask`, `createTaskRelative`, `updateTask`, `moveTask`, `transferTask`, `approveTask`, `addComment`, `addChatComment`, `updateComment`.
+- New exported type `QuireCompactRef` — `{ oid: string; id?: number }`. Return types use a `const Compact extends boolean = false` generic so call sites narrow from the literal: `client.createTask(...)` stays `Promise<QuireTask>`, `client.createTask(..., { compact: true })` becomes `Promise<QuireCompactRef>`. Existing callers are unaffected — the default preserves the pre-0.1.10 return type exactly.
+- `approveTask` compact path returns a `QuireCompactRef` of the **task** (not the approval) — matches the server's `compactResponse(oidTask, task.id)` shape verified against approval_api.dart.
+
 ## 0.1.9 — 2026-05-22
 
 - Bulk task endpoints accept a new `dryRun?: boolean` option — `bulkCreateTasks`, `bulkCreateSubtasks`, `bulkUpdateTasks`, `bulkRemoveTasks`, `bulkMoveTasks`, `bulkTransferTasks`, `bulkApproveTasks`. Forwarded as `?dry-run=true`. The server runs the full operation in a transaction (auth, permission, FK, business rules) and rolls back before responding, so the result payload mirrors the real call's shape — a successful dry-run signals that resubmitting without the flag is likely to succeed. Race conditions and quota consumption between calls aren't pre-checked. Per-item rate-limit cost still applies to dry-runs.
