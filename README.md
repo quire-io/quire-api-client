@@ -117,6 +117,69 @@ new QuireClient({
 
 The logger interface is `{ error, info, debug?, warn? }` — any structural match works.
 
+## Search filters
+
+`searchTasks` (project), `searchTasksInOrganization`, and `searchTasksInFolder` all accept the same `QuireTaskSearchParams` shape. See the [interface in `src/client.ts`](src/client.ts#L90-L152) for the full field list and per-field JSDoc; this section covers the grammar shared across many fields.
+
+### Boolean grammar (user / tag / priority / type / createdBy / recurring)
+
+`assignee`, `assignor`, `follower`, `createdBy`, `tag`, `priority`, `type`, `recurring` all share the same grammar:
+
+| Token | Meaning |
+|---|---|
+| `,` | AND |
+| `\|` | OR |
+| `!` | NOT |
+
+Values pass through verbatim — the server parses. Quote names containing spaces or special characters: `tag: '"In Progress"'`.
+
+### Date columns
+
+`created`, `edited`, `archived`, `unarchived`, `toggled`, `start`, `due` accept three operand styles:
+
+| Style | Example | Notes |
+|---|---|---|
+| Keyword | `due: "today"` | `past`, `yesterday`, `today`, `tomorrow`, `upcoming`, `last7d`, `next7d`, `lastWeek`, `thisWeek`, `nextWeek` — timezone is the caller's. |
+| `op:value` | `created: "ge:2026-01-01T00:00:00Z"` | Ops: `ge`, `gt`, `le`, `lt`, `eq`, `ne`, `between`, `notBetween`. Operand is ISO 8601; `between` / `notBetween` are inclusive on both ends. |
+| Null | `archived: "isNull"` | `isNull` / `isNotNull`, nullable fields only. |
+
+`start` and `due` additionally accept a date-only operand (`YYYY-MM-DD`) that expands to a whole-day window in the caller's timezone.
+
+### Scope restrictions
+
+`sublist` and `customFields` are **project-scope only** — the org and folder endpoints reject them with `Unsupported query parameter`.
+
+### Pagination
+
+Pair `limit` (integer, or `"no"` for unlimited; free-plan cap is 30) with `cursor`. The last item of each page carries a `cursor` field; pass it as the next request's `cursor` (with the same `limit` and filters) to fetch the next page. The absence of `cursor` on the final item signals end of stream. `cursor` cannot combine with `sublist` (400).
+
+### Examples
+
+Mixed filters — boolean grammar, date range, pagination cap:
+
+```ts
+const tasks = await client.searchTasks(projectOid, {
+  status: "active",
+  tag: '"In Progress",urgent',         // (In Progress) AND urgent
+  assignee: `${me.oid}|${teammate.oid}`, // me OR teammate
+  due: "between:2026-05-01,2026-05-31",
+  priority: "high|urgent",
+  limit: 50,
+});
+```
+
+Recently modified (any edit, comment, status flip, etc.) — use the `modified` interval, **not** a date column:
+
+```ts
+const recent = await client.searchTasks(projectOid, {
+  modified: "7d",        // "24h" / "30m" also valid; default is "7d"
+  status: "active",
+  limit: 50,
+});
+```
+
+`modified` defaults to `"7d"` if omitted; pass `modified: false` to search the full history. The response isn't sorted by modified time — sort client-side on `QuireTask.modified` if you need most-recent-first.
+
 ## Errors
 
 | Class | Thrown when |
