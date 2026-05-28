@@ -151,3 +151,47 @@ describe.skipIf(!hasTokens)("Live API — /task/search (Apr 27 2026 filters)", (
     expect(hits.some((t) => t.oid === highTaskOid)).toBe(false);
   });
 });
+
+// Numeric custom fields (Number / Money / Duration) accept the same
+// `op:value` grammar as date columns since May 27 2026 (boeneo #24851).
+// TSF9-TSF11 anchor a Cost=100 fixture and verify ge: (matches),
+// gt: (boundary excluded), and between: (inclusive).
+describe.skipIf(!hasTokens)("Live API — /task/search numeric custom-field op:value", () => {
+  const client = liveClient();
+  const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
+
+  let taskOid = "";
+
+  beforeAll(async () => {
+    const t = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-tsf-cfop`,
+      customFields: { Cost: 100 },
+    });
+    taskOid = t.oid;
+  });
+
+  afterAll(async () => {
+    if (taskOid) await client.deleteTask(taskOid).catch(() => {});
+  });
+
+  it("TSF9 customFields:{Cost:'ge:50'} matches a task with Cost=100", async () => {
+    const hits = await client.searchTasks(PROJECT_OID, {
+      customFields: { Cost: "ge:50" },
+    });
+    expect(hits.some((t) => t.oid === taskOid)).toBe(true);
+  });
+
+  it("TSF10 customFields:{Cost:'gt:100'} excludes a task with Cost=100", async () => {
+    const hits = await client.searchTasks(PROJECT_OID, {
+      customFields: { Cost: "gt:100" },
+    });
+    expect(hits.some((t) => t.oid === taskOid)).toBe(false);
+  });
+
+  it("TSF11 customFields:{Cost:'between:50,150'} matches a task with Cost=100", async () => {
+    const hits = await client.searchTasks(PROJECT_OID, {
+      customFields: { Cost: "between:50,150" },
+    });
+    expect(hits.some((t) => t.oid === taskOid)).toBe(true);
+  });
+});

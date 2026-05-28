@@ -4,7 +4,7 @@
 
 Endpoints wrapped by [`QuireClient`](src/client.ts). Compare against the [Quire REST API docs](https://quire.io/dev/api/) to spot gaps.
 
-Generated from 110 client methods covering 116 endpoints across 23 sections.
+Generated from 111 client methods covering 117 endpoints across 23 sections.
 
 ## User
 
@@ -220,6 +220,7 @@ Generated from 110 client methods covering 116 endpoints across 23 sections.
 | `updateInsight` | `PUT` | `/api/insight/{insightOid}` |
 | `deleteInsight` | `DELETE` | `/api/insight/{insightOid}` |
 | `undoRemoveInsight` | `PUT` | `/api/insight/undo-remove/{insightOid}` |
+| `runInsight` | `GET` | `/api/insight/run/{insightOid}[?…]` |
 
 ## Insight custom-field definitions — Apr 22 2026
 

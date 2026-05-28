@@ -133,4 +133,34 @@ describe.skipIf(!hasTokens)("Live API — /task/approve + /revoke-approval", () 
     // Tear back down so afterAll's DELETE doesn't trip on a half-state.
     await client.revokeTaskApproval(taskOid);
   });
+
+  // May 27 2026: /task/approve accepts an optional companion comment that
+  // is posted on the task as a side effect of the approval. The stored
+  // comment is auto-prefixed with `**<stream>: <status>**\n\n`. The
+  // approval response shape is unchanged — fetch the comment via
+  // getTaskComments to verify it landed.
+  it("TA7 approveTask({state:'approve',comment:{description}}) posts a prefixed comment", async () => {
+    const description = `TA7 review note ${runTag}`;
+
+    await client.approveTask(taskOid, { state: "request" });
+
+    const approval = (await client.approveTask(taskOid, {
+      state: "approve",
+      comment: { description },
+    })) as QuireApproval & { requesterRef?: { oid: string; id: string } };
+    expect(approval.state).toBe("approved");
+
+    const comments = await client.getTaskComments(taskOid);
+    const match = comments.find((c) =>
+      typeof c.description === "string" && c.description.includes(description),
+    );
+    expect(match).toBeDefined();
+    // Server-applied prefix: `**<stream>: <status>**\n\n`. State `approve`
+    // maps to "Approve" in the stored prefix; default category renders the
+    // stream as "Approval".
+    expect(match!.description!.startsWith("**")).toBe(true);
+    expect(match!.description).toContain("**\n\n");
+
+    await client.revokeTaskApproval(taskOid);
+  });
 });

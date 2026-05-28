@@ -145,6 +145,22 @@ Values pass through verbatim — the server parses. Quote names containing space
 
 `start` and `due` additionally accept a date-only operand (`YYYY-MM-DD`) that expands to a whole-day window in the caller's timezone.
 
+### Numeric custom fields (May 27 2026)
+
+Number / Money / Duration custom fields accept the **same `op:value` grammar** as date columns — `ge:` / `gt:` / `le:` / `lt:` / `eq:` / `ne:` / `between:v1,v2` (inclusive) / `notBetween:v1,v2` / `isNull` / `isNotNull` (case-insensitive). A bare value is exact match (equivalent to `eq:`). Duration operands use the same `8h` / `30m` shape as the `modified` interval.
+
+```ts
+await client.searchTasks(projectOid, {
+  customFields: {
+    Cost: "ge:100",                 // Money: ≥ 100
+    Score: "between:50,150",         // Number: 50 ≤ x ≤ 150
+    Effort: "between:8h,40h",        // Duration: 8h ≤ x ≤ 40h
+  },
+});
+```
+
+Other custom-field types are exact match — `Email` / `Hyperlink` also accept `~` / `~*` prefix for regex; `Text` custom fields aren't searchable here (use the top-level `text` parameter for full-text search).
+
 ### Scope restrictions
 
 `sublist` and `customFields` are **project-scope only** — the org and folder endpoints reject them with `Unsupported query parameter`.

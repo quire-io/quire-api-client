@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.11 — 2026-05-28
+
+- New `QuireClient.runInsight(insightOid, { groupBy?, status? })` — runs a project-scoped insight server-side and returns the aggregated 2D-array result (`[[headers...], [row...], ...]`). Wraps `GET /insight/run/{insightOid}` from the May 27 2026 server release (#24834). `groupBy` defaults to `member` and accepts `section`; `status` defaults to `active` and accepts `completed` / `all`. Status is applied at the SQL load layer so narrower queries cost less.
+- `approveTask` body extends to accept an optional `comment?: { description, pinned?, asUser? }` — when supplied, the server posts a companion comment on the task as a side effect of the approval, auto-prefixed with `**<stream>: <status>**\n\n` (May 27 2026, #24855). The approval response shape is unchanged; fetch the created comment via `getTaskComments` if you need it. `bulk-approve` is intentionally not extended (server-side decision — its body is already a top-level task-ref array).
+- `searchTasks` (project / org / folder) — Number, Money, and Duration custom-field filters now accept the same `op:value` grammar as date columns: `ge:` / `gt:` / `le:` / `lt:` / `eq:` / `ne:` / `between:v1,v2` (inclusive) / `notBetween:v1,v2` / `isNull` / `isNotNull` (case-insensitive). A bare value remains exact match (May 27 2026, #24851). No client shape change — `customFields: { Cost: "ge:100" }` just works now; README's **Numeric custom fields** subsection documents the grammar.
+
 ## 0.1.10 — 2026-05-22
 
 - Single-resource write methods on the hot path accept an optional `compact?: boolean`. When true the client appends `?return=compact`; the server skips its post-write reload + render and returns just `{oid, id}` — meaningful network + CPU win for agent / bulk workflows that only need the OID to chain a follow-up call. Methods covered: `createTask`, `createSubtask`, `createTaskRelative`, `updateTask`, `moveTask`, `transferTask`, `approveTask`, `addComment`, `addChatComment`, `updateComment`.

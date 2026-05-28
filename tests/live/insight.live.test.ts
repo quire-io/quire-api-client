@@ -187,3 +187,60 @@ describe.skipIf(!hasTokens)("Live API — /insight/*-field", () => {
     expect(got.fields?.[fieldB]).toBeUndefined();
   });
 });
+
+// GET /insight/run/{insightOid} (May 27 2026) returns a JSON 2D array:
+// row 0 is column headers, subsequent rows are one aggregated row per
+// group. Project-scoped insights only; org-scoped insights 400. Status is
+// applied at the SQL load layer so narrower queries cost less.
+// GET /insight/run/{insightOid} (May 27 2026, #24834) returns a JSON 2D
+// array: row 0 is column headers, subsequent rows are one aggregated
+// row per group. Project-scoped insights only; org-scoped 400. Status
+// is applied at the SQL load layer so narrower queries cost less. The
+// by-OID dispatch bug in getWorkScope was tracked as #24880.
+describe.skipIf(!hasTokens)("Live API — /insight/run", () => {
+  const client = liveClient();
+  const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
+  const insightName = `${runTag}-insight-run`;
+  let insightOid: string | undefined;
+
+  beforeAll(async () => {
+    const created = await client.createInsight("project", PROJECT_OID, {
+      name: insightName,
+    });
+    insightOid = created.oid;
+  });
+
+  afterAll(async () => {
+    if (insightOid) await client.deleteInsight(insightOid).catch(() => {});
+  });
+
+  it("IR1 runInsight returns a JSON 2D array with a header row", async () => {
+    const res = await client.runInsight(insightOid!);
+    expect(Array.isArray(res)).toBe(true);
+    expect(res.length).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(res[0])).toBe(true);
+    expect(res[0]!.length).toBeGreaterThan(0);
+  });
+
+  it("IR2 runInsight honors group-by=section and status=all", async () => {
+    const res = await client.runInsight(insightOid!, {
+      groupBy: "section",
+      status: "all",
+    });
+    expect(Array.isArray(res)).toBe(true);
+    expect(res.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("IR3 runInsight rejects unknown group-by with 400", async () => {
+    let caught: unknown;
+    try {
+      await client.runInsight(insightOid!, {
+        groupBy: "bogus" as "member",
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toMatch(/400/);
+  });
+});

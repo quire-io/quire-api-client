@@ -109,7 +109,20 @@ export interface QuireTaskSearchParams {
   cursor?: string;
   /** Project-scope only: filter to tasks in one sublist by its OID. */
   sublist?: string;
-  /** Project-scope only: custom-field filters keyed by the field's display name. */
+  /**
+   * Project-scope only: custom-field filters keyed by the field's display
+   * name. Per-type matching (server-side):
+   *   - Number / Money / Duration: bare numeric (`100`) or `op:value` grammar
+   *     accepted — `ge:` / `gt:` / `le:` / `lt:` / `eq:` / `ne:` /
+   *     `between:v1,v2` (inclusive) / `notBetween:v1,v2` / `isNull` /
+   *     `isNotNull` (case-insensitive). Duration values follow the same
+   *     `8h` / `30m` shape as `modified`. (May 27 2026)
+   *   - Email / Hyperlink: exact match; `~` / `~*` prefix for regex.
+   *   - Checkbox: `"true"` or `"false"`.
+   *   - Select / User / Task: exact value match (user accepts OID or id).
+   *   - Text custom fields are not searchable here — use the top-level
+   *     `text` parameter for full-text search.
+   */
   customFields?: Record<string, unknown>;
   // ---- User-ref filters (Apr 24 2026) --------------------------------------
   // Values are user OID / id / email. Boolean grammar: `,` (AND), `|` (OR),
@@ -1410,7 +1423,12 @@ export class QuireClient {
   // POST /task/approve handles every state transition — the `state` query
   // param selects the action (`request`, `approve`, `reject`, `change`).
   // Apr 27 moved state/category from the request body to the query string
-  // (body is now unused) so the grammar matches the bulk-approve endpoint.
+  // so the grammar matches the bulk-approve endpoint. May 27 2026 reused
+  // the request body for an optional companion comment: when `comment` is
+  // supplied, the server posts a comment on the task as a side effect of
+  // the approval, prefixed with `**<stream>: <status>**\n\n`. The
+  // approval response shape is unchanged — fetch the created comment via
+  // `/comment/list/{taskOid}` if needed.
   // Response is the Approval object only (not the full task). DELETE
   // /task/revoke-approval returns 204 with no body in all three cases:
   // rolling back approved/rejected → awaiting, clearing awaiting/changes
@@ -1428,6 +1446,18 @@ export class QuireClient {
       state: "request" | "approve" | "reject" | "change";
       category?: string;
       compact?: Compact;
+      /**
+       * Optional companion comment posted on the task as a side effect of
+       * the approval (May 27 2026). `description` is required when supplied;
+       * the server auto-prefixes the stored comment with
+       * `**<stream>: <status>**\n\n`. The created comment is not part of
+       * the approval response — fetch it via `getTaskComments` afterward.
+       */
+      comment?: {
+        description: string;
+        pinned?: boolean;
+        asUser?: string;
+      };
     },
   ): Promise<Compact extends true ? QuireCompactRef : QuireApproval> {
     const qs = new URLSearchParams({ state: body.state });
@@ -1435,7 +1465,10 @@ export class QuireClient {
     if (body.compact) qs.set("return", "compact");
     return this.fetch(
       `/task/approve/${taskOid}?${qs.toString()}`,
-      { method: "POST" },
+      {
+        method: "POST",
+        ...(body.comment ? { body: JSON.stringify(body.comment) } : {}),
+      },
     ) as Promise<Compact extends true ? QuireCompactRef : QuireApproval>;
   }
 
@@ -1864,6 +1897,23 @@ export class QuireClient {
     return this.fetch<QuireInsight>(`/insight/undo-remove/${insightOid}`, {
       method: "PUT",
     });
+  }
+
+  // GET /insight/run/{insightOid} (May 27 2026) — runs the insight and
+  // returns the aggregated result as a JSON 2D array: row 0 is headers,
+  // subsequent rows are one aggregated row per group. Project-scoped
+  // insights only; org-scoped insights return 400. Rate-limit: standard
+  // 1-unit grantLoad + soft post-charge of `ceil(tasksLoaded / 250) - 1`
+  // for very large result sets.
+  async runInsight(
+    insightOid: string,
+    options?: { groupBy?: "member" | "section"; status?: "active" | "completed" | "all" },
+  ): Promise<unknown[][]> {
+    const qs = new URLSearchParams();
+    if (options?.groupBy !== undefined) qs.set("group-by", options.groupBy);
+    if (options?.status !== undefined) qs.set("status", options.status);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return this.fetch<unknown[][]>(`/insight/run/${insightOid}${suffix}`);
   }
 
   // -----------------------------------------------------------------------
