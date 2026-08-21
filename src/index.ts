@@ -54,6 +54,8 @@ export type {
   QuireChat,
   QuireComment,
   QuireCompactRef,
+  QuireDashboard,
+  QuireDashboardOwnerType,
   QuireDocument,
   QuireEnumValue,
   QuireFieldDefinition,

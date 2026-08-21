@@ -655,3 +655,141 @@ describe("getRateLimit hits the hyphenated path (May 22 2026)", () => {
     );
   });
 });
+
+describe("dashboard endpoints (Jul 20 2026)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  it("listDashboards hits /dashboard/list/{ownerType}/{ownerOid}", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await mkClient().listDashboards("project", "oid-p1");
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      "https://quire.io/api/dashboard/list/project/oid-p1",
+    );
+  });
+
+  it("getDashboard hits /dashboard/{oid}", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "d1", id: "D1", name: "x" }));
+    await mkClient().getDashboard("oid-d1");
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      "https://quire.io/api/dashboard/oid-d1",
+    );
+  });
+
+  it("getDashboardById hits the by-ID form and URL-encodes segments", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "d1", id: "D1", name: "x" }));
+    await mkClient().getDashboardById("organization", "my org", "Board 101");
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      "https://quire.io/api/dashboard/id/organization/my%20org/Board%20101",
+    );
+  });
+
+  it("createDashboard POSTs to /dashboard/{ownerType}/{ownerOid}", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "d1", id: "D1", name: "x" }));
+    await mkClient().createDashboard("smart-folder", "oid-sf1", { name: "x" });
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe("https://quire.io/api/dashboard/smart-folder/oid-sf1");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ name: "x" });
+  });
+
+  it("updateDashboard PUTs archive toggle and null date clears", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "d1", id: "D1", name: "x" }));
+    await mkClient().updateDashboard("oid-d1", { archived: true, due: null });
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe("https://quire.io/api/dashboard/oid-d1");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body as string)).toEqual({ archived: true, due: null });
+  });
+
+  it("deleteDashboard DELETEs /dashboard/{oid}", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await mkClient().deleteDashboard("oid-d1");
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe("https://quire.io/api/dashboard/oid-d1");
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("undoRemoveDashboard PUTs /dashboard/undo-remove/{oid}", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "d1", id: "D1", name: "x" }));
+    await mkClient().undoRemoveDashboard("oid-d1");
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe("https://quire.io/api/dashboard/undo-remove/oid-d1");
+    expect(init.method).toBe("PUT");
+  });
+});
+
+describe("chat/doc follower fields (Jun 4 2026)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  it("createChat forwards followers in the body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "c1", id: "C1", name: "x" }));
+    await mkClient().createChat("project", "oid-p1", {
+      name: "x",
+      followers: ["me", "alice@example.com"],
+    });
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({
+      name: "x",
+      followers: ["me", "alice@example.com"],
+    });
+  });
+
+  it("updateChat forwards the full-replace followers list", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "c1", id: "C1", name: "x" }));
+    await mkClient().updateChat("oid-c1", { followers: ["alice"] });
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({ followers: ["alice"] });
+  });
+
+  it("createDocument forwards followers in the body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "d1", id: "D1", name: "x" }));
+    await mkClient().createDocument("project", "oid-p1", {
+      name: "x",
+      followers: ["app"],
+    });
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({
+      name: "x",
+      followers: ["app"],
+    });
+  });
+
+  it("updateDocument forwards follower deltas", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ oid: "d1", id: "D1", name: "x" }));
+    await mkClient().updateDocument("oid-d1", {
+      addFollowers: ["alice"],
+      removeFollowers: ["bob"],
+    });
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({
+      addFollowers: ["alice"],
+      removeFollowers: ["bob"],
+    });
+  });
+});

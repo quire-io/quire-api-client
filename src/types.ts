@@ -429,6 +429,10 @@ export interface QuireChat {
   start?: string;
   due?: string;
   archivedAt?: string;
+  // Follower management shipped Jun 4 2026 — both lists are user refs.
+  // `mutes` is the subset of followers who muted the channel.
+  followers?: { oid: string; id: string; name: string }[];
+  mutes?: { oid: string; id: string; name: string }[];
   createdBy?: { oid: string; id: string; name: string };
   createdAt?: string;
   [key: string]: unknown;
@@ -438,6 +442,43 @@ export interface QuireChat {
 // Document
 // ---------------------------------------------------------------------------
 export interface QuireDocument {
+  oid: string;
+  id: string;
+  name: string;
+  nameText?: string;
+  nameHtml?: string;
+  description?: string;
+  descriptionText?: string;
+  descriptionHtml?: string;
+  url?: string;
+  image?: string;
+  iconColor?: string;
+  owner?: unknown;
+  partner?: unknown;
+  start?: string;
+  due?: string;
+  archivedAt?: string;
+  // Follower management shipped Jun 4 2026 — only project-owned documents
+  // are followable; the fields are absent for other owner types.
+  followers?: { oid: string; id: string; name: string }[];
+  mutes?: { oid: string; id: string; name: string }[];
+  createdBy?: { oid: string; id: string; name: string };
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard — collection of widgets owned by a project, organization,
+// folder, or smart-folder (Jul 20 2026). The API manages the dashboard
+// container only; widget definitions are not part of the public API yet.
+// ---------------------------------------------------------------------------
+export type QuireDashboardOwnerType =
+  | "project"
+  | "organization"
+  | "folder"
+  | "smart-folder";
+
+export interface QuireDashboard {
   oid: string;
   id: string;
   name: string;

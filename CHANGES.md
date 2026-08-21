@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12 — 2026-08-21
+
+- **Dashboard API** (server release Jul 20 2026, zkoss/boeneo#25387) — new `QuireDashboard` type plus seven methods: `listDashboards(ownerType, ownerOid)`, `getDashboard(oid)`, `getDashboardById(ownerType, ownerId, dashboardId)`, `createDashboard(ownerType, ownerOid, body)`, `updateDashboard(oid, body)` (set `archived: true`/`false` to archive/unarchive; pass `null` on `start`/`due` to clear), `deleteDashboard(oid)`, and `undoRemoveDashboard(oid)` (idempotent, `429` at the per-owner quota — same as create). Owner types: `project`, `organization`, `folder`, `smart-folder` (exported as `QuireDashboardOwnerType`). The API manages the dashboard container only — widget definitions aren't part of the public API yet.
+- **Chat & Doc follower management** (server release Jun 4 2026) — `createChat` / `createDocument` accept an optional `followers?: string[]` (user OID, ID, or email; `"me"` / `"app"` with the `app|team` / `app|/path` syntaxes). `updateChat` gains full-replace `followers` alongside the existing `addFollowers` / `removeFollowers`; `updateDocument` gains all three. `QuireChat` / `QuireDocument` response types now declare `followers` and `mutes`. Note: documents are followable only when project-owned — sending follower fields for other owner types returns `400`.
+- No client change needed for the Jul 31 2026 Comment API URL-form removals — the client already uses only the surviving forms (`/comment/{commentOid}`, `/comment/chat/{chatOid}`, `/comment/list/chat/{chatOid}`, OID-form undo-remove).
+
 ## 0.1.11 — 2026-05-28
 
 - New `QuireClient.runInsight(insightOid, { groupBy?, status? })` — runs a project-scoped insight server-side and returns the aggregated 2D-array result (`[[headers...], [row...], ...]`). Wraps `GET /insight/run/{insightOid}` from the May 27 2026 server release (#24834). `groupBy` defaults to `member` and accepts `section`; `status` defaults to `active` and accepts `completed` / `all`. Status is applied at the SQL load layer so narrower queries cost less.

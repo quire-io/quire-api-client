@@ -232,6 +232,18 @@ Generated from 111 client methods covering 117 endpoints across 23 sections.
 | `moveInsightField` | `PUT` | `/api/insight/move-field/{insightOid}/{fieldName}[?…]` |
 | `removeInsightField` | `DELETE` | `/api/insight/remove-field/{insightOid}/{fieldName}` |
 
+## Dashboards — Jul 20 2026
+
+| Method | HTTP | Endpoint |
+|---|---|---|
+| `listDashboards` | `GET` | `/api/dashboard/list/{ownerType}/{ownerOid}` |
+| `getDashboard` | `GET` | `/api/dashboard/{dashboardOid}` |
+| `getDashboardById` | `GET` | `/api/dashboard/id/{ownerType}/{ownerId}/{dashboardId}` |
+| `createDashboard` | `POST` | `/api/dashboard/{ownerType}/{ownerOid}` |
+| `updateDashboard` | `PUT` | `/api/dashboard/{dashboardOid}` |
+| `deleteDashboard` | `DELETE` | `/api/dashboard/{dashboardOid}` |
+| `undoRemoveDashboard` | `PUT` | `/api/dashboard/undo-remove/{dashboardOid}` |
+
 ## Notifications
 
 | Method | HTTP | Endpoint |

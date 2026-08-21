@@ -34,6 +34,8 @@ import type {
   QuireTaskNode,
   QuireTimelog,
   QuireChat,
+  QuireDashboard,
+  QuireDashboardOwnerType,
   QuireDocument,
   QuireTokens,
   QuireUser,
@@ -1739,6 +1741,9 @@ export class QuireClient {
     body: {
       name: string;
       description?: string;
+      // Jun 4 2026 — only valid when the owner is a project; other owner
+      // types return 400. Same value grammar as createChat's `followers`.
+      followers?: string[];
     },
   ): Promise<QuireDocument> {
     return this.fetch<QuireDocument>(`/doc/${ownerType}/${ownerOid}`, {
@@ -1753,6 +1758,11 @@ export class QuireClient {
       name?: string;
       description?: string;
       archived?: boolean;
+      // Jun 4 2026 — only valid on project-owned documents (400 otherwise).
+      // `followers` replaces the whole list; the delta forms add/remove.
+      followers?: string[];
+      addFollowers?: string[];
+      removeFollowers?: string[];
     },
   ): Promise<QuireDocument> {
     return this.fetch<QuireDocument>(`/doc/${docOid}`, {
@@ -1786,7 +1796,15 @@ export class QuireClient {
   async createChat(
     ownerType: string,
     ownerOid: string,
-    body: { name: string; description?: string; partner?: string },
+    body: {
+      name: string;
+      description?: string;
+      partner?: string;
+      // Jun 4 2026 — user OID, ID, or email; also `"me"` / `"app"` (with the
+      // `app|team` / `app|/path` syntaxes). The current user is added
+      // automatically.
+      followers?: string[];
+    },
   ): Promise<QuireChat> {
     return this.fetch<QuireChat>(`/chat/${ownerType}/${ownerOid}`, {
       method: "POST",
@@ -1809,6 +1827,9 @@ export class QuireClient {
       name?: string;
       description?: string;
       archived?: boolean;
+      // `followers` replaces the whole list (Jun 4 2026); the delta forms
+      // add/remove without touching the rest.
+      followers?: string[];
       addFollowers?: string[];
       removeFollowers?: string[];
     },
@@ -1976,6 +1997,94 @@ export class QuireClient {
     await this.fetch<void>(
       `/insight/remove-field/${insightOid}/${encodeURIComponent(fieldName)}`,
       { method: "DELETE" },
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // Dashboards — Jul 20 2026
+  //
+  // Widget collections owned by a project, organization, folder, or
+  // smart-folder. The API manages the dashboard container only (name,
+  // description, icon, dates, archive state) — widget definitions are not
+  // part of the public API yet. Create / undo-remove count against a
+  // per-owner quota and return 429 when the plan limit is reached.
+  // -----------------------------------------------------------------------
+
+  async listDashboards(
+    ownerType: QuireDashboardOwnerType,
+    ownerOid: string,
+  ): Promise<QuireDashboard[]> {
+    return this.fetch<QuireDashboard[]>(
+      `/dashboard/list/${ownerType}/${ownerOid}`,
+    );
+  }
+
+  async getDashboard(dashboardOid: string): Promise<QuireDashboard> {
+    return this.fetch<QuireDashboard>(`/dashboard/${dashboardOid}`);
+  }
+
+  // By-ID form: owner ID (e.g. project slug) + dashboard ID.
+  async getDashboardById(
+    ownerType: QuireDashboardOwnerType,
+    ownerId: string,
+    dashboardId: string,
+  ): Promise<QuireDashboard> {
+    return this.fetch<QuireDashboard>(
+      `/dashboard/id/${ownerType}/${encodeURIComponent(ownerId)}/${encodeURIComponent(dashboardId)}`,
+    );
+  }
+
+  async createDashboard(
+    ownerType: QuireDashboardOwnerType,
+    ownerOid: string,
+    body: {
+      name: string;
+      id?: string;
+      description?: string;
+      iconColor?: string;
+      image?: string;
+      partner?: string;
+      start?: string;
+      due?: string;
+    },
+  ): Promise<QuireDashboard> {
+    return this.fetch<QuireDashboard>(`/dashboard/${ownerType}/${ownerOid}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  // Set `archived: true` / `false` to archive or unarchive. Pass null on
+  // `start` / `due` to clear the existing date.
+  async updateDashboard(
+    dashboardOid: string,
+    body: {
+      id?: string;
+      name?: string;
+      description?: string;
+      iconColor?: string;
+      image?: string;
+      start?: string | null;
+      due?: string | null;
+      archived?: boolean;
+    },
+  ): Promise<QuireDashboard> {
+    return this.fetch<QuireDashboard>(`/dashboard/${dashboardOid}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async deleteDashboard(dashboardOid: string): Promise<void> {
+    await this.fetch<void>(`/dashboard/${dashboardOid}`, { method: "DELETE" });
+  }
+
+  // Idempotent; subject to the same per-owner quota as create (429 when
+  // the plan limit is reached).
+  async undoRemoveDashboard(dashboardOid: string): Promise<QuireDashboard> {
+    return this.fetch<QuireDashboard>(
+      `/dashboard/undo-remove/${dashboardOid}`,
+      { method: "PUT" },
     );
   }
 
