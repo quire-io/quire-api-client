@@ -4,7 +4,7 @@
 
 Endpoints wrapped by [`QuireClient`](src/client.ts). Compare against the [Quire REST API docs](https://quire.io/dev/api/) to spot gaps.
 
-Generated from 111 client methods covering 117 endpoints across 23 sections.
+Generated from 118 client methods covering 124 endpoints across 24 sections.
 
 ## User
 
