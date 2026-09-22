@@ -196,6 +196,51 @@ const recent = await client.searchTasks(projectOid, {
 
 `modified` defaults to `"7d"` if omitted; pass `modified: false` to search the full history. The response isn't sorted by modified time — sort client-side on `QuireTask.modified` if you need most-recent-first.
 
+## Followers
+
+Follower fields share one value grammar everywhere they appear: a user **OID, ID, or email**, plus these special values:
+
+| Value | Meaning |
+|---|---|
+| `"me"` | The authenticated user |
+| `"app"` | The application itself (receives hook notifications) |
+| `"app\|team"`, `"app\|team\|channel"` | App follower routed to a team / channel |
+| `"app\|/path"` | Appended to the registered hook URL — hook `https://super.app/hooks/standard` + `"app\|/soc1/33456/a7"` → `https://super.app/hooks/standard/soc1/33456/a7` |
+| `"inherit"` | **Tasks only.** On add: pull in the parent task's followers. On remove: drop the ones inherited from the parent. |
+
+Three field shapes, all optional and independent:
+
+- `followers` — replaces the entire list.
+- `addFollowers` / `removeFollowers` — edit in place, leaving the rest alone.
+
+| Method | `followers` | `addFollowers` / `removeFollowers` |
+|---|---|---|
+| `createTask` / `createSubtask` / `createTaskRelative` | ✅ | — (create has no list to diff) |
+| `updateTask` | ✅ | ✅ |
+| `bulkCreateTasks` / `bulkCreateSubtasks` / `bulkUpdateTasks` | ✅ | ✅ (update only — items are pass-through `Record<string, unknown>`) |
+| `updateProject` | ✅ | ✅ |
+| `updateOrganization` | ✅ | ✅ |
+| `createChat` / `createDocument` | ✅ | — |
+| `updateChat` / `updateDocument` | ✅ | ✅ |
+
+```ts
+// Follow a task as the current user, and route notifications to the app.
+await client.updateTask(taskOid, { addFollowers: ["me", "app|eng|alerts"] });
+
+// Stop following, but leave everyone else alone.
+await client.updateTask(taskOid, { removeFollowers: ["me"] });
+
+// Pin the list to exactly these two.
+await client.updateTask(taskOid, { followers: [aliceOid, "bob@example.com"] });
+```
+
+Notes:
+
+- The creating user is added as a follower automatically by `createTask` — passing `followers` at creation adds to that, it doesn't replace it.
+- Responses carry followers back as objects (`{ oid, id, name }[]`) on `QuireTask.followers`, `QuireProject.followers`, `QuireOrganization.followers`, `QuireChat.followers`, `QuireDocument.followers` — not as the string refs you sent.
+- Documents are followable only when **project-owned**; sending follower fields for other owner types returns `400`.
+- `searchTasks` has a separate read-side `follower` filter — see [Search filters](#search-filters).
+
 ## Errors
 
 | Class | Thrown when |

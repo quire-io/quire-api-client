@@ -51,6 +51,7 @@ describe.skipIf(!hasTokens)("Quire API — /task", () => {
 
   let task: QuireTask;
   let subtask: QuireTask;
+  let followerTask: QuireTask | undefined;
   let tag: QuireTag;
   let me: QuireUser;
 
@@ -67,6 +68,9 @@ describe.skipIf(!hasTokens)("Quire API — /task", () => {
     }
     if (tag?.oid) {
       await client.deleteTag(tag.oid).catch(() => {});
+    }
+    if (followerTask?.oid) {
+      await client.deleteTask(followerTask.oid).catch(() => {});
     }
   });
 
@@ -260,6 +264,47 @@ describe.skipIf(!hasTokens)("Quire API — /task", () => {
     });
     expect(created.etc).toBe(7200);
     await client.deleteTask(created.oid);
+  });
+
+  // Task followers. Same value grammar as the project / org / chat / doc
+  // follower fields, plus the task-only `"inherit"` (parent's followers).
+  // Quire adds the creator as a follower automatically, so TF2 removes
+  // first and re-adds — the reverse order would assert nothing.
+  it("TF1 createTask with followers accepts the `me` alias", async () => {
+    followerTask = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-followers`,
+      followers: ["me"],
+    });
+    expect(
+      (followerTask.followers ?? []).some((f) => f.oid === me.oid),
+    ).toBe(true);
+  });
+
+  it("TF2 updateTask removes then re-adds a follower", async () => {
+    const removed = await client.updateTask(followerTask!.oid, {
+      removeFollowers: [me.oid],
+    });
+    expect((removed.followers ?? []).some((f) => f.oid === me.oid)).toBe(false);
+
+    const added = await client.updateTask(followerTask!.oid, {
+      addFollowers: [me.oid],
+    });
+    expect((added.followers ?? []).some((f) => f.oid === me.oid)).toBe(true);
+  });
+
+  it("TF3 updateTask with followers replaces the whole list", async () => {
+    const cleared = await client.updateTask(followerTask!.oid, {
+      followers: [],
+    });
+    expect(cleared.followers ?? []).toEqual([]);
+
+    const restored = await client.updateTask(followerTask!.oid, {
+      followers: [me.oid],
+    });
+    expect((restored.followers ?? []).some((f) => f.oid === me.oid)).toBe(true);
+
+    await client.deleteTask(followerTask!.oid);
+    followerTask = undefined; // prevent afterAll re-delete
   });
 
   // Quire clears dates on `null`, NOT empty string ("" → 400 "Invalid time

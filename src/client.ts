@@ -450,14 +450,17 @@ export class QuireClient {
     return this.fetch<QuireRateLimit>(`/rate-limit/${orgOid}`);
   }
 
-  // PUT /organization accepts `name`, `description`, and follower deltas
-  // (Apr 22 2026). Response now includes `editedAt`. See O4 and O5 in
+  // PUT /organization accepts `name`, `description`, and the follower
+  // fields (full-replace `followers` plus the deltas, Apr 22 2026).
+  // Response now includes `editedAt`. See O4 and O5 in
   // tests/quire_api/organization.test.ts.
   async updateOrganization(
     orgOid: string,
     body: {
       name?: string;
       description?: string;
+      // Replaces the whole follower list; the delta forms edit in place.
+      followers?: string[];
       addFollowers?: string[];
       removeFollowers?: string[];
     },
@@ -507,8 +510,9 @@ export class QuireClient {
   }
 
   // PUT /project accepts `name`, `description`, `start`, `due`,
-  // `archived` (bool toggle), `public` (bool toggle), and follower deltas
-  // (Apr 22 2026). Pass null on `start` / `due` to clear the existing
+  // `archived` (bool toggle), `public` (bool toggle), and the follower
+  // fields (full-replace `followers` plus the deltas, Apr 22 2026).
+  // Pass null on `start` / `due` to clear the existing
   // date. Response now includes `start`, `due`, `archivedAt`, `publicAt`,
   // and the `fields` custom-field map. See P7, P10, P11, P12 in
   // tests/quire_api/project.test.ts.
@@ -521,6 +525,8 @@ export class QuireClient {
       due?: string | null;
       archived?: boolean;
       public?: boolean;
+      // Replaces the whole follower list; the delta forms edit in place.
+      followers?: string[];
       addFollowers?: string[];
       removeFollowers?: string[];
     },
@@ -873,6 +879,11 @@ export class QuireClient {
       priority?: string;
       tags?: string[];
       assignees?: string[];
+      // Task followers (OID, ID, or email). Special values: `"me"` (current
+      // user), `"inherit"` (the parent task's followers), and `"app"` (with
+      // the `app|team` / `app|team|channel` / `app|/path` syntaxes). The
+      // current user is added automatically regardless.
+      followers?: string[];
       // Built-in Estimate field. Wire name is `etc` (non-negative integer
       // seconds). NOT a custom field — Quire 400s if sent under `customFields`.
       etc?: number;
@@ -905,6 +916,11 @@ export class QuireClient {
       priority?: string;
       tags?: string[];
       assignees?: string[];
+      // Task followers (OID, ID, or email). Special values: `"me"` (current
+      // user), `"inherit"` (the parent task's followers), and `"app"` (with
+      // the `app|team` / `app|team|channel` / `app|/path` syntaxes). The
+      // current user is added automatically regardless.
+      followers?: string[];
       etc?: number;
       milestone?: boolean;
       section?: boolean;
@@ -935,6 +951,11 @@ export class QuireClient {
       priority?: string;
       tags?: string[];
       assignees?: string[];
+      // Task followers (OID, ID, or email). Special values: `"me"` (current
+      // user), `"inherit"` (the parent task's followers), and `"app"` (with
+      // the `app|team` / `app|team|channel` / `app|/path` syntaxes). The
+      // current user is added automatically regardless.
+      followers?: string[];
       etc?: number;
       milestone?: boolean;
       section?: boolean;
@@ -969,12 +990,22 @@ export class QuireClient {
       status?: number;
       tags?: string[];
       assignees?: string[];
+      // Replaces the whole follower list. Same value grammar as the delta
+      // forms below — see addFollowers.
+      followers?: string[];
       // Incremental tag/assignee edits; passed straight through to Quire,
       // which accepts these alongside the replace-mode `tags` / `assignees`.
       addTags?: string[];
       removeTags?: string[];
       addAssignees?: string[];
       removeAssignees?: string[];
+      // Follower deltas (OID, ID, or email). Special values: `"me"` (current
+      // user), `"app"` (the app itself, with the `app|team` /
+      // `app|team|channel` / `app|/path` syntaxes), and `"inherit"` — which
+      // on add pulls in the parent task's followers and on remove drops the
+      // ones inherited from the parent.
+      addFollowers?: string[];
+      removeFollowers?: string[];
       // Task dependencies. The source task's `successors` list is the only
       // editable side — `predecessors` is computed server-side by reverse
       // lookup. Each element: task OID, or "#<numeric-id>" (see

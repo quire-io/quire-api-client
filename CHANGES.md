@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Task follower management** — `createTask` / `createSubtask` / `createTaskRelative` accept an optional `followers?: string[]`; `updateTask` gains full-replace `followers` plus `addFollowers` / `removeFollowers`. Values are user OID, ID, or email, plus `"me"`, `"app"` (with the `app|team` / `app|team|channel` / `app|/path` syntaxes), and the task-only `"inherit"` — on add it pulls in the parent task's followers, on remove it drops the ones inherited from the parent. `QuireTask.followers` was already declared, so reads are unchanged. Covered by TF1-TF3 in `tests/live/task.live.test.ts`.
+- `updateProject` / `updateOrganization` gain the full-replace `followers` field to sit alongside the `addFollowers` / `removeFollowers` deltas they already had — `UpdateProjectBody` / `UpdateOrganizationBody` have accepted it since Apr 22 2026, the client just never exposed it.
+- The bulk task endpoints (`bulkCreateTasks`, `bulkCreateSubtasks`, `bulkUpdateTasks`) needed no change — their items are pass-through `Record<string, unknown>`, so `BulkUpdateTaskItem`'s follower fields already worked.
+- New README **Followers** section documents the shared value grammar (including the `app|…` hook-path forms) and which methods take which field shape.
+
 ## 0.1.12 — 2026-08-21
 
 - **Dashboard API** (server release Jul 20 2026, zkoss/boeneo#25387) — new `QuireDashboard` type plus seven methods: `listDashboards(ownerType, ownerOid)`, `getDashboard(oid)`, `getDashboardById(ownerType, ownerId, dashboardId)`, `createDashboard(ownerType, ownerOid, body)`, `updateDashboard(oid, body)` (set `archived: true`/`false` to archive/unarchive; pass `null` on `start`/`due` to clear), `deleteDashboard(oid)`, and `undoRemoveDashboard(oid)` (idempotent, `429` at the per-owner quota — same as create). Owner types: `project`, `organization`, `folder`, `smart-folder` (exported as `QuireDashboardOwnerType`). The API manages the dashboard container only — widget definitions aren't part of the public API yet.
