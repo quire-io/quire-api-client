@@ -1,16 +1,27 @@
 /**
  * Format a Quire API error into a short user-facing message.
  *
- * Quire's error response shapes vary by status code:
- *   - 400 validation → JSON `{ code, message }` (e.g. "Invalid color for …")
- *   - 469 ecQuotaExceeded → JSON `{ code: 469, message }` (legacy shape)
- *   - 429 with JSON `{ code: 469, message }` → quota exceeded *wrapped* in
- *     429. Observed for `POST /insight/{projectOid}` on a free-plan project
- *     against a Quire dev server: HTTP 429, body `{"code":469,"message":
- *     "Unable to perform this action due to insight quota limitations…"}`.
- *     We treat any 4xx with `code: 469` in the body as quota-exceeded.
- *   - 429 (rate limit, no JSON body) → throttling, retry after wait
+ * Quire's error response shapes vary by status code. The Sep 21 2026
+ * release made the HTTP status reflect the kind of failure and reserved
+ * 429 for rate limits:
+ *   - 400 validation → JSON `{ code: 400, message }` (e.g. a missing name,
+ *     or a duplicate / reserved id). Previously these carried `code: 469`.
+ *   - 402 with `code: 469` → a plan limit or quota (task limit, custom
+ *     fields, dashboard, insight, sublist, chat, doc). Retrying never
+ *     helps; upgrading does.
+ *   - 402 with `code: 470` → the subscription has EXPIRED. Distinct from a
+ *     plan limit: only resubscribing clears it, and no upgrade path within
+ *     the current plan applies.
+ *   - 403 with `code: 471` → the account is temporarily blocked.
+ *   - 429 → the per-minute / per-hour API rate limit, and only that. Always
+ *     carries `Retry-After`.
  *   - 401 / 403 / 404 → a full HTML error page
+ *
+ * Pre-Sep-21 servers returned 469 as a bare status, and wrapped quota in
+ * HTTP 429 with a `code: 469` body. Both are still recognised — the
+ * `code: 469` body check runs regardless of status, so a client talking to
+ * an older server keeps getting the quota message rather than a misleading
+ * "retry after" one.
  *
  * Dropping raw HTML from thrown Errors keeps consumer-facing failures
  * readable — otherwise the caller surfaces an entire <!DOCTYPE html>
@@ -20,6 +31,7 @@
 const STATUS_HINTS: Readonly<Record<number, string>> = Object.freeze({
   400: "bad request",
   401: "unauthorized — token invalid or expired",
+  402: "payment required — plan limit or expired subscription",
   403: "forbidden — missing Authorization header or insufficient OAuth scope",
   404: "not found — resource may have been deleted or the OID/ID is wrong",
   409: "conflict",
@@ -97,14 +109,33 @@ export function formatQuireError(
   path?: string,
   retryAfter?: string | null,
 ): string {
-  // Quota-exceeded check runs BEFORE the generic 429 branch — Quire
-  // wraps `ecQuotaExceeded` (code 469) inside HTTP 429 for some endpoints
-  // (e.g. POST /insight/{projectOid} on free plan), and the generic 429
-  // path would mis-tell the caller to wait and retry when retrying won't help.
-  const quotaMessage = extractQuotaMessage(body, contentType);
-  if (status === 469 || quotaMessage !== null) {
-    return quotaMessage
-      ? `Quire quota exceeded (469): ${quotaMessage} See https://quire.io/pricing.`
+  // Body-code checks run BEFORE the status branches below. Since Sep 21
+  // 2026 the status carries the category (402 / 403) and the body code the
+  // specific cause; on older servers quota arrived as a bare 469 or wrapped
+  // in a 429, and the generic 429 path would mis-tell the caller to wait
+  // and retry when retrying can never help.
+  const bodyCode = extractCode(body, contentType);
+  const bodyMessage = extractMessage(body, contentType);
+
+  // 470 — expired subscription. Checked before 469 so it doesn't get
+  // reported as a plan limit: no upgrade clears an expired subscription.
+  if (bodyCode === 470) {
+    return bodyMessage
+      ? `Quire subscription expired (470): ${bodyMessage} See https://quire.io/pricing.`
+      : "Quire subscription expired (470). Resubscribe at https://quire.io/pricing.";
+  }
+
+  // 471 — temporarily blocked account. Not a permissions problem, so keep
+  // it clear of the generic 403 hint about OAuth scopes.
+  if (bodyCode === 471) {
+    return bodyMessage
+      ? `Quire account temporarily blocked (471): ${bodyMessage}`
+      : "Quire account temporarily blocked (471). Try again later or contact Quire support.";
+  }
+
+  if (status === 469 || bodyCode === 469) {
+    return bodyMessage
+      ? `Quire quota exceeded (469): ${bodyMessage} See https://quire.io/pricing.`
       : "Quire quota exceeded (469). See https://quire.io/pricing.";
   }
 
@@ -149,25 +180,34 @@ export function formatQuireError(
   return base;
 }
 
-// Returns the body's `message` when the JSON body has `code: 469`
-// (ecQuotaExceeded) — used to detect quota errors regardless of HTTP
-// status (Quire wraps quota in 429 on at least one endpoint).
-function extractQuotaMessage(
+// The JSON body's `code`, which since Sep 21 2026 carries the specific
+// cause while the HTTP status carries the category. Read independently of
+// status so a pre-Sep-21 server's 429-wrapped 469 is still recognised.
+function extractCode(body: string, contentType: string | null): number | null {
+  const parsed = parseJsonBody(body, contentType);
+  return typeof parsed?.code === "number" ? parsed.code : null;
+}
+
+function extractMessage(
   body: string,
   contentType: string | null,
 ): string | null {
+  const parsed = parseJsonBody(body, contentType);
+  return typeof parsed?.message === "string" && parsed.message.length > 0
+    ? parsed.message
+    : null;
+}
+
+function parseJsonBody(
+  body: string,
+  contentType: string | null,
+): { code?: unknown; message?: unknown } | null {
   if (!contentType || !contentType.includes("application/json")) return null;
   try {
-    const parsed = JSON.parse(body) as { code?: unknown; message?: unknown };
-    if (parsed.code === 469
-        && typeof parsed.message === "string"
-        && parsed.message.length > 0) {
-      return parsed.message;
-    }
+    return JSON.parse(body) as { code?: unknown; message?: unknown };
   } catch {
-    // not JSON — fall through to null
+    return null;
   }
-  return null;
 }
 
 // Parse the Retry-After header into a short human string. Accepts the

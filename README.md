@@ -249,6 +249,18 @@ Notes:
 | `QuireTokenRefreshError` | A token refresh failed with a specific HTTP status. 4xx → grant is dead (the client converts these to `QuireAuthRevokedError` automatically); 5xx → transient, callers may retry. |
 | `Error` (with formatted message) | Any other Quire API failure — body is run through `formatQuireError` so it stays compact and consumer-friendly. |
 
+Since the Sep 21 2026 server release the HTTP status carries the category and the JSON body's `code` the specific cause. `formatQuireError` maps them to distinct messages, because the recovery differs:
+
+| Status + body `code` | Meaning | What helps |
+|---|---|---|
+| `402` + `469` | Plan limit or quota (tasks, custom fields, dashboard, insight, sublist, chat, doc) | Upgrading. Retrying never does. |
+| `402` + `470` | Subscription **expired** | Resubscribing — no in-plan upgrade clears it |
+| `403` + `471` | Account temporarily blocked | Waiting, or contacting Quire |
+| `429` | The per-minute / per-hour API rate limit, and only this | Backing off; always carries `Retry-After` |
+| `400` + `400` | Validation (missing name, duplicate or reserved id) | Fixing the request |
+
+Before that release, plan limits and expired subscriptions both came back as `429`, which invited callers to back off and retry a condition that only upgrading could clear. The body-`code` checks are status-independent, so a client pointed at an older server still gets the right message.
+
 ## Development
 
 ```bash

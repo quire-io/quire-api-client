@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+Covers the **Sep 21 2026** server release (zkoss/boeneo#25825).
+
+- **Error taxonomy** — `formatQuireError` follows the release's status split, which moved plan limits off `429`:
+    - `402` + body `code` `469` → plan limit / quota. Previously `429`, which invited a back-off-and-retry that could never clear it.
+    - `402` + `470` → **expired subscription**, checked before 469 so it isn't reported as a plan limit — only resubscribing helps.
+    - `403` + `471` → temporarily blocked account, kept clear of the generic 403 hint about OAuth scopes.
+    - `429` now means the API rate limit and nothing else; validation errors carry `code: 400` where they used to carry `469`.
+    - The body-`code` checks are status-independent, so the legacy bare-`469` and `429`-wrapped-`469` shapes still resolve to the quota message against an older server. SUB7 accepts either status and pins the body code.
+
 - **Task follower management** — `createTask` / `createSubtask` / `createTaskRelative` accept an optional `followers?: string[]`; `updateTask` gains full-replace `followers` plus `addFollowers` / `removeFollowers`. Values are user OID, ID, or email, plus `"me"`, `"app"` (with the `app|team` / `app|team|channel` / `app|/path` syntaxes), and the task-only `"inherit"` — on add it pulls in the parent task's followers, on remove it drops the ones inherited from the parent. `QuireTask.followers` was already declared, so reads are unchanged. Covered by TF1-TF3 in `tests/live/task.live.test.ts`.
 - `updateProject` / `updateOrganization` gain the full-replace `followers` field to sit alongside the `addFollowers` / `removeFollowers` deltas they already had — `UpdateProjectBody` / `UpdateOrganizationBody` have accepted it since Apr 22 2026, the client just never exposed it.
 - The bulk task endpoints (`bulkCreateTasks`, `bulkCreateSubtasks`, `bulkUpdateTasks`) needed no change — their items are pass-through `Record<string, unknown>`, so `BulkUpdateTaskItem`'s follower fields already worked.

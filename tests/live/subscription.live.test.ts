@@ -107,21 +107,20 @@ describe.skipIf(!hasTokens)("Live API — subscription / plan gating", () => {
     expect([402, 403]).toContain(res.status);
   });
 
-  // SUB7 — Pins the wrapped-quota shape returned by POST /insight on a
+  // SUB7 — Pins the plan-limit shape returned by POST /insight on a
   // free-plan project:
-  //   HTTP 429 + JSON { code: 469, message: "Unable to perform … quota …" }
+  //   HTTP 402 + JSON { code: 469, message: "Unable to perform … quota …" }
   //
-  // Originally reported as OAuth/scope failure by an AI assistant — the
-  // real cause was plan gating, but Quire wraps `ecQuotaExceeded` (internal
-  // code 469) inside HTTP 429 (not HTTP 469 as you'd guess from the code).
-  // formatQuireError detects this shape; this test guards against a Quire-
-  // side change to the wrapping silently regressing the LLM-facing error
-  // text.
+  // Originally reported as an OAuth/scope failure by an AI assistant — the
+  // real cause was plan gating. Until Sep 21 2026 Quire wrapped
+  // `ecQuotaExceeded` (internal code 469) inside HTTP 429, which invited
+  // clients to back off and retry a condition that only upgrading clears;
+  // that release moved it to 402 Payment Required and reserved 429 for the
+  // API rate limit. The body code is unchanged at 469.
   //
-  // helpers.ts's rawApi peeks at the JSON body on 429 and short-circuits
-  // the retry loop when `code === 469`, so this resolves immediately on
-  // the wrapped-quota response.
-  it("SUB7 free project POST /insight is wrapped quota (429 + body code 469)", async () => {
+  // 429 is still accepted here so the suite passes against a pre-Sep-21
+  // server; the body code is what actually pins the contract.
+  it("SUB7 free project POST /insight is a plan limit (402 + body code 469)", async () => {
     const projects = (await rawApi<QuireProject[]>(
       "GET",
       `/project/list/${freeOid}`,
@@ -147,7 +146,7 @@ describe.skipIf(!hasTokens)("Live API — subscription / plan gating", () => {
       // Best-effort cleanup if create somehow slipped through.
       await client.deleteInsight(res.data.oid).catch(() => {});
     }
-    expect(res.status).toBe(429);
+    expect([402, 429]).toContain(res.status);
     expect(res.data?.code).toBe(469);
     expect(res.data?.message).toMatch(/quota|insight/i);
   });

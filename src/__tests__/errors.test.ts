@@ -31,6 +31,52 @@ describe("formatQuireError", () => {
     );
   });
 
+  // Sep 21 2026 — plan limits and quotas moved from 429 to 402, keeping
+  // body code 469. The body-code check is status-independent, so both the
+  // new and the legacy shape land on the same message.
+  it("maps 402 with `code: 469` to the quota message", () => {
+    const body = JSON.stringify({
+      code: 469,
+      message: "Unable to perform this action due to insight quota limitations.",
+    });
+    expect(formatQuireError(402, body, "application/json")).toBe(
+      "Quire quota exceeded (469): Unable to perform this action due to insight quota limitations. See https://quire.io/pricing.",
+    );
+  });
+
+  // 470 is an EXPIRED subscription, not a plan limit — no upgrade clears
+  // it, only resubscribing, so it must not read as a quota message.
+  it("maps 402 with `code: 470` to the expired-subscription message", () => {
+    const body = JSON.stringify({ code: 470, message: "Subscription expired." });
+    expect(formatQuireError(402, body, "application/json")).toBe(
+      "Quire subscription expired (470): Subscription expired. See https://quire.io/pricing.",
+    );
+  });
+
+  it("maps a bare 402 with `code: 470` and no message", () => {
+    expect(formatQuireError(402, JSON.stringify({ code: 470 }), "application/json")).toBe(
+      "Quire subscription expired (470). Resubscribe at https://quire.io/pricing.",
+    );
+  });
+
+  // 471 is a temporarily blocked account. The generic 403 hint talks about
+  // OAuth scopes, which would send the caller down the wrong path.
+  it("maps 403 with `code: 471` to the blocked-account message", () => {
+    const body = JSON.stringify({ code: 471, message: "Account is blocked." });
+    expect(formatQuireError(403, body, "application/json")).toBe(
+      "Quire account temporarily blocked (471): Account is blocked.",
+    );
+  });
+
+  // Validation errors carry `code: 400` since Sep 21 2026 (they used to
+  // carry 469). They must reach the generic message path, NOT the quota one.
+  it("treats a 400 with `code: 400` as an ordinary validation error", () => {
+    const body = JSON.stringify({ code: 400, message: "Name is required." });
+    expect(formatQuireError(400, body, "application/json")).toBe(
+      "Quire API error 400: Name is required.",
+    );
+  });
+
   it("falls through to the rate-limit message for a 429 without `code: 469`", () => {
     expect(formatQuireError(429, "", "text/html", "/task/oid_x", "30"))
       .toBe("Quire API error 429 (rate limited — retry after 30s)");
