@@ -8,6 +8,11 @@
  * pass into `QuireClient`) instead of going through helpers' rawApi —
  * exercises the OAuth helper too. For the bogus-token case the helper
  * throws `QuireTokenRefreshError`, which carries the HTTP status.
+ *
+ * Both tests need a refresh token to exist, and OA1 needs a real one. A
+ * public (PKCE) app's code exchange may not return one at all, so the suite
+ * skips rather than fails when the env file has none. OA2 only needs the
+ * client credentials, so it runs whenever they're present.
  */
 
 import { describe, it, expect } from "vitest";
@@ -15,19 +20,24 @@ import {
   refreshTokens,
   QuireTokenRefreshError,
 } from "../../src/index.js";
-import { hasTokens, readEnv } from "./helpers.js";
+import { hasTokens, readEnv, readEnvOptional } from "./helpers.js";
 
 describe.skipIf(!hasTokens)("Live API — /oauth/token", () => {
+  if (!hasTokens) return;
+
   const apiServer = readEnv("QUIRE_API_SERVER");
   const clientId = readEnv("QUIRE_CLIENT_ID");
-  const clientSecret = readEnv("QUIRE_CLIENT_SECRET");
+  // Undefined for a public (PKCE) app — refreshTokens omits the parameter
+  // entirely in that case, which is the correct wire shape for one.
+  const clientSecret = readEnvOptional("QUIRE_CLIENT_SECRET");
+  const refreshToken = readEnvOptional("QUIRE_TEST_REFRESH_TOKEN");
 
-  it("OA1 refreshTokens issues a fresh access token", async () => {
+  it.skipIf(!refreshToken)("OA1 refreshTokens issues a fresh access token", async () => {
     const tokens = await refreshTokens({
       apiServer,
       clientId,
       clientSecret,
-      refreshToken: readEnv("QUIRE_TEST_REFRESH_TOKEN"),
+      refreshToken: refreshToken!,
     });
     expect(typeof tokens.accessToken).toBe("string");
     expect(tokens.accessToken.length).toBeGreaterThan(0);

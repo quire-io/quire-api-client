@@ -88,10 +88,12 @@ let currentAccessToken: string | undefined;
 let cachedClient: QuireClient | undefined;
 
 // Construct a QuireClient bound to the test tokens, with auto-refresh wired
-// up. Access tokens expire in ~1 hour; refresh tokens are long-lived and
-// don't rotate (Quire returns the same refresh_token on each refresh), so
-// the same env file keeps working across many test runs without manual
-// intervention. `expiresAt` is set to "now" so the client refreshes
+// up when a refresh token is available. Access tokens expire in ~1 hour;
+// refresh tokens are long-lived and don't rotate (Quire returns the same
+// refresh_token on each refresh), so the same env file keeps working across
+// many test runs without manual intervention. A public (PKCE) app may not
+// get a refresh token at all — then the run is good until the access token
+// lapses and prepare has to be re-run. `expiresAt` is set to "now" so the client refreshes
 // proactively on the first call — the access token in the env file may
 // already be stale by the time we read it.
 //
@@ -104,17 +106,38 @@ export function liveClient(): QuireClient {
   const apiServer = readEnv("QUIRE_API_SERVER");
   const clientId = readEnv("QUIRE_CLIENT_ID");
   const clientSecret = readEnvOptional("QUIRE_CLIENT_SECRET");
+  const refreshToken = readEnvOptional("QUIRE_TEST_REFRESH_TOKEN");
   cachedClient = new QuireClient({
     apiServer,
     tokens: {
       accessToken: readEnv("QUIRE_TEST_ACCESS_TOKEN"),
-      refreshToken: readEnv("QUIRE_TEST_REFRESH_TOKEN"),
+      // Optional: a public (PKCE) app's token exchange may come back without
+      // a refresh_token. The recorded expiry below then keeps the client
+      // from trying to refresh until the access token actually lapses, at
+      // which point the run fails with the message from refreshTokens.
+      refreshToken: refreshToken ?? "",
       // Use the prepare-script's recorded expiry if available; default to
-      // "now" so the client refreshes proactively on the first call.
-      expiresAt: Number(readEnvOptional("QUIRE_TEST_EXPIRES_AT")) || Date.now(),
+      // "now" so the client refreshes proactively on the first call. With no
+      // refresh token there's nothing to refresh WITH, so trust the recorded
+      // expiry instead of forcing a doomed refresh on call one.
+      expiresAt: refreshToken
+        ? Number(readEnvOptional("QUIRE_TEST_EXPIRES_AT")) || Date.now()
+        : Number(readEnvOptional("QUIRE_TEST_EXPIRES_AT")) || 0,
     },
-    refreshTokens: (refreshToken) =>
-      refreshTokens({ apiServer, clientId, clientSecret, refreshToken }),
+    refreshTokens: (rt) => {
+      if (!rt) {
+        throw new Error(
+          `No QUIRE_TEST_REFRESH_TOKEN in ${ENV_PATH}, and the access token ` +
+            `has expired. Re-run: npm run test:live:prepare`,
+        );
+      }
+      return refreshTokens({
+        apiServer,
+        clientId,
+        clientSecret,
+        refreshToken: rt,
+      });
+    },
     onTokenRefresh: async (tokens) => {
       currentAccessToken = tokens.accessToken;
     },

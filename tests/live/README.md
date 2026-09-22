@@ -30,10 +30,13 @@ npm run test:live:prepare
 
 ## Prerequisites
 
-1. A Quire OAuth app you control, with `http://localhost:8000/callback`
-   registered as a redirect URI. (The same app the production caller uses is
-   fine — the live tests are scoped to a dedicated test project, not the
-   production data.)
+1. A Quire OAuth app you control, with a loopback redirect URI registered —
+   `http://127.0.0.1/callback` is enough, since Quire matches loopback
+   redirects by prefix and ignores the port. (The same app the production
+   caller uses is fine — the live tests are scoped to a dedicated test
+   project, not the production data.) Both app kinds work: set
+   `QUIRE_CLIENT_SECRET` for a confidential client, or leave it blank for a
+   public client, where the bootstrap script falls back to PKCE.
 2. A dedicated test project in a workspace the authorized user belongs to.
    The bootstrap script defaults to the slug `Quire_API_Test_Project`; forks
    need their own slug since Quire project ids are workspace-globally unique
@@ -98,9 +101,9 @@ QUIRE_CLIENT_SECRET=<from your Quire OAuth app>
 EOF
 ```
 
-You need a Quire OAuth app you control, with `http://localhost:8000/callback`
-in its registered redirect URIs (so the bootstrap script can receive the
-authorization code on `localhost:8000`).
+You need a Quire OAuth app you control, with a loopback redirect URI
+registered (so the bootstrap script can receive the authorization code on
+`127.0.0.1`). `http://127.0.0.1/callback` covers it — the port is ignored.
 
 ### Step 2 — Run the OAuth bootstrap
 
@@ -110,20 +113,24 @@ npm run test:live:prepare
 
 What it does:
 
-1. **Reads** `QUIRE_API_SERVER`, `QUIRE_CLIENT_ID`, and `QUIRE_CLIENT_SECRET`
-   from the env file you just created. If any of those three are missing it
-   exits with a "Missing X — seed the file with …" message and stops.
-2. Opens a browser to Quire's OAuth consent screen for your client id.
-3. Listens on `http://localhost:8000/callback` for the redirect-back code.
-4. POSTs the code to `${QUIRE_API_SERVER}/oauth/token`, gets back
+1. **Reads** `QUIRE_API_SERVER` and `QUIRE_CLIENT_ID` from the env file you
+   just created — if either is missing it exits with a "Missing X — seed the
+   file with …" message and stops. `QUIRE_CLIENT_SECRET` is optional: present
+   means a confidential client, blank/absent switches the flow to PKCE.
+2. Binds an ephemeral loopback port and derives the redirect URI from it, so
+   there's nothing to free up first. Set `QUIRE_OAUTH_PORT` to pin a port.
+3. Opens a browser to Quire's OAuth consent screen for your client id.
+4. Listens on `http://127.0.0.1:<port>/callback` for the redirect-back code.
+5. POSTs the code to `${QUIRE_API_SERVER}/oauth/token` — with
+   `client_secret` or `code_verifier` depending on the mode — and gets back
    `access_token` + `refresh_token` + `expires_in`.
-5. Looks up the test project's OID and the workspace OID via
+6. Looks up the test project's OID and the workspace OID via
    `GET /project/id/{QUIRE_TEST_PROJECT_ID}` — the slug already in the env
    file if set, otherwise the default `Quire_API_Test_Project`. A project
    with that exact slug must exist in a workspace the authorizing user
    belongs to.
-6. **Writes** the file back in place. Your three input creds are preserved;
-   the previous file is backed up to `<file>.bak`.
+7. **Writes** the file back in place. Your input creds are preserved; the
+   previous file is backed up to `<file>.bak`.
 
 > **Where does `test:live:prepare` get the client id?** From the env file in
 > step 1 — that's the only source. There's no hardcoded id, no CLI flag, no

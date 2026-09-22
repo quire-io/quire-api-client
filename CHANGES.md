@@ -6,6 +6,9 @@
 - `updateProject` / `updateOrganization` gain the full-replace `followers` field to sit alongside the `addFollowers` / `removeFollowers` deltas they already had — `UpdateProjectBody` / `UpdateOrganizationBody` have accepted it since Apr 22 2026, the client just never exposed it.
 - The bulk task endpoints (`bulkCreateTasks`, `bulkCreateSubtasks`, `bulkUpdateTasks`) needed no change — their items are pass-through `Record<string, unknown>`, so `BulkUpdateTaskItem`'s follower fields already worked.
 - New README **Followers** section documents the shared value grammar (including the `app|…` hook-path forms) and which methods take which field shape.
+- **Live-test bootstrap now works with public (PKCE) OAuth apps** — `scripts/prepare-test-tokens.ts` treats `QUIRE_CLIENT_SECRET` as optional: present keeps the confidential authorization-code flow, blank/absent switches to PKCE (S256 challenge on the authorize leg, `code_verifier` on the token leg). Needed because the Quire CLI app is a public client with no secret, so the old secret-only path 400s against it.
+- The bootstrap's loopback server now binds an ephemeral port (`listen(0, "127.0.0.1")`) and derives `redirect_uri` from the bound port, matching what quire-cli does. Quire ignores the port on loopback redirects (RFC 8252 §7.3, documented under "Loopback redirect URIs" in the API reference), so a registration of `http://127.0.0.1/callback` covers every port. Removes the "free up port 8000 first" requirement; `QUIRE_OAUTH_PORT` pins a port if an app registration needs one.
+- `tests/live/helpers.ts` no longer hard-requires `QUIRE_TEST_REFRESH_TOKEN` — a public app's code exchange may not return one. Without it the client trusts the recorded `expiresAt` instead of forcing a refresh on the first call, and a refresh attempt fails with a "re-run prepare" message. `oauth.live.test.ts` OA1 skips when there's no refresh token; OA2 still runs.
 
 ## 0.1.12 — 2026-08-21
 
