@@ -18,7 +18,7 @@ Requires Node.js 20+.
 
 | Module | Exports |
 |---|---|
-| `QuireClient` | Authenticated client covering tasks, projects, organizations, comments, chats, documents, insights, dashboards, partners, sublists, statuses, tags, custom fields, attachments, timelogs, approvals, undo. Auto-refreshes tokens via a caller-supplied callback. See [COVERAGE.md](COVERAGE.md) for the full per-endpoint table. |
+| `QuireClient` | Authenticated client covering tasks, projects, organizations, comments, chats, documents, insights, dashboards, reminders, partners, sublists, statuses, tags, custom fields, attachments, timelogs, approvals, undo. Auto-refreshes tokens via a caller-supplied callback. See [COVERAGE.md](COVERAGE.md) for the full per-endpoint table. |
 | `exchangeCode` / `refreshTokens` | Parametrized OAuth helpers. Supports both confidential clients (pass `clientSecret`) and public PKCE clients (pass `codeVerifier`). |
 | `formatQuireError` | Maps an HTTP error response into a short, user-readable string. Knows about Quire's quota / rate-limit / paid-plan signals. |
 | `QuireAuthRevokedError`, `QuireTokenRefreshError` | Typed errors thrown by `QuireClient` and the OAuth helpers. |
@@ -264,6 +264,43 @@ Rules worth knowing before you send it:
 - Every listed user must already be a member of the owner, and a non-empty list **must include you**. A non-member is rejected with `400` rather than being dropped silently the way a task's `assignees` are.
 - `members` cannot be combined with `partner` — that already shares the record with the whole project and the external team. The pair is `400`.
 - Responses return `members` as user objects (`{ oid, id, name }`), matching `followers` and `mutes`. Before the Sep 21 2026 server release it was a list of OID strings.
+
+## Reminders
+
+A reminder notifies the people it names, either before a task's start/due date or at a time of its own. Unlike every other work endpoint, **`ownerType` is always required** — there is no implied `project`.
+
+```ts
+// Standalone reminder on a project
+await client.createReminder("project", projectOid, {
+  when: "2027-01-15T09:00:00.000Z",
+  leads: [{ minutes: 30 }, { days: 1, at: "09:00" }],
+});
+
+// Personal reminder in your own inbox
+await client.createReminder("project", "-", { when: "2027-01-15T09:00:00.000Z" });
+
+// On a task that already has a start or due date — send `leads` alone
+await client.createReminder("task", taskOid, { leads: [{ days: 1 }] });
+```
+
+What it fires from depends on the task:
+
+- Task **with** a start or due date → it fires from that date. Sending `when` or `recurrence` is rejected with `400`, because they would be ignored.
+- No task, or a task with **neither** date → `when` is required.
+
+`leads` says when to notify ahead of the fire time, one notification each. Each entry names exactly one of `minutes` (an absolute offset) or `days` (calendar days, so it keeps its wall-clock time across a daylight-saving change); `at` (`"HH:mm"`) is only valid with `days` and is read in the creating member's timezone. Omitting `leads` means a single notification at the fire time (`[{ minutes: 0 }]`). Max 30 leads, none negative or beyond 10,000 days.
+
+Listing is by owner, and a project's list includes the reminders on its tasks — narrow it by passing `"task"`:
+
+```ts
+await client.listReminders("project", projectOid);        // project + its tasks'
+await client.listReminders("task", taskOid);              // just this task's
+await client.listReminders("project", projectOid, { limit: 100 });
+```
+
+Reminders are ordered by `oid` — stable, but **not** chronological, so sort client-side on the field you care about. With a numeric `limit`, the last item of a page carries a `cursor` when more remain.
+
+`deleteReminder` is **permanent**: a reminder is not moved to the trash and cannot be restored, so there is no undo-remove for it.
 
 ## Errors
 

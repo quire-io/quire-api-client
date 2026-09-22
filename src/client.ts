@@ -27,6 +27,9 @@ import type {
   QuireProject,
   QuireRateLimit,
   QuireRecurrence,
+  QuireReminder,
+  QuireReminderLead,
+  QuireReminderOwnerType,
   QuireStatus,
   QuireSublist,
   QuireTag,
@@ -2190,4 +2193,203 @@ export class QuireClient {
     });
   }
 
+  // -----------------------------------------------------------------------
+  // Reminders (Sep 21 2026)
+  //
+  // A reminder notifies the people it names, either before a task's start
+  // or due date or at a time of its own.
+  //
+  // `ownerType` is ALWAYS required — unlike sublist / doc / chat / insight /
+  // dashboard, these endpoints have no implied `project`. Pass `"project"`
+  // with an ownerOid of `"-"` for the caller's own inbox (a personal
+  // reminder, visible to nobody else).
+  //
+  // What a reminder fires from depends on its task:
+  //   - task WITH a start or due date → it fires from that date. Send
+  //     `leads` alone; `when` / `recurrence` are rejected with 400 because
+  //     they would be ignored.
+  //   - no task, or a task with neither date → `when` is required.
+  //
+  // Delete is permanent: a reminder is not moved to the trash and cannot be
+  // restored, so there is no undoRemoveReminder.
+  // -----------------------------------------------------------------------
+
+  async createReminder<const Compact extends boolean = false>(
+    ownerType: QuireReminderOwnerType,
+    ownerOid: string,
+    body: QuireCreateReminderBody,
+    options?: { compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireReminder> {
+    const qs = options?.compact ? "?return=compact" : "";
+    return this.fetch(`/reminder/${ownerType}/${ownerOid}${qs}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }) as Promise<Compact extends true ? QuireCompactRef : QuireReminder>;
+  }
+
+  // ID-form create. For a task use createTaskReminderById instead — a task
+  // ID is unique only within its project, so it needs both segments.
+  async createReminderById<const Compact extends boolean = false>(
+    ownerType: Exclude<QuireReminderOwnerType, "task">,
+    ownerId: string,
+    body: QuireCreateReminderBody,
+    options?: { compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireReminder> {
+    const qs = options?.compact ? "?return=compact" : "";
+    return this.fetch(
+      `/reminder/id/${ownerType}/${encodeURIComponent(ownerId)}${qs}`,
+      { method: "POST", body: JSON.stringify(body) },
+    ) as Promise<Compact extends true ? QuireCompactRef : QuireReminder>;
+  }
+
+  async createTaskReminderById<const Compact extends boolean = false>(
+    projectId: string,
+    taskId: string,
+    body: QuireCreateReminderBody,
+    options?: { compact?: Compact },
+  ): Promise<Compact extends true ? QuireCompactRef : QuireReminder> {
+    const qs = options?.compact ? "?return=compact" : "";
+    return this.fetch(
+      `/reminder/id/task/${encodeURIComponent(projectId)}/${encodeURIComponent(taskId)}${qs}`,
+      { method: "POST", body: JSON.stringify(body) },
+    ) as Promise<Compact extends true ? QuireCompactRef : QuireReminder>;
+  }
+
+  async getReminder(reminderOid: string): Promise<QuireReminder> {
+    return this.fetch<QuireReminder>(`/reminder/${reminderOid}`);
+  }
+
+  // A project's list includes the reminders on its tasks, not just the
+  // standalone ones — pass ownerType `"task"` with a task OID to narrow it
+  // to one task's. Reminders on a trashed task are left out (they come back
+  // if it is restored, and stay reachable by OID meanwhile).
+  //
+  // Ordered by `oid`: stable, but NOT chronological — sort client-side on
+  // the field you care about.
+  async listReminders(
+    ownerType: QuireReminderOwnerType,
+    ownerOid: string,
+    options: QuireReminderListOptions = {},
+  ): Promise<QuireReminder[]> {
+    const qs = reminderListQuery(options);
+    return this.fetch<QuireReminder[]>(
+      `/reminder/list/${ownerType}/${ownerOid}${qs}`,
+    );
+  }
+
+  async listRemindersById(
+    ownerType: Exclude<QuireReminderOwnerType, "task">,
+    ownerId: string,
+    options: QuireReminderListOptions = {},
+  ): Promise<QuireReminder[]> {
+    const qs = reminderListQuery(options);
+    return this.fetch<QuireReminder[]>(
+      `/reminder/list/id/${ownerType}/${encodeURIComponent(ownerId)}${qs}`,
+    );
+  }
+
+  async listTaskRemindersById(
+    projectId: string,
+    taskId: string,
+    options: QuireReminderListOptions = {},
+  ): Promise<QuireReminder[]> {
+    const qs = reminderListQuery(options);
+    return this.fetch<QuireReminder[]>(
+      `/reminder/list/id/task/${encodeURIComponent(projectId)}/${encodeURIComponent(taskId)}${qs}`,
+    );
+  }
+
+  // Only `when`, `recurrence`, `leads` and `name` can be changed. `members`
+  // and `partner` are create-only — recreate the reminder to change who can
+  // see it.
+  async updateReminder(
+    reminderOid: string,
+    body: {
+      // Rejected with 400 on a reminder whose task has a start or due date
+      // (it fires from the task's schedule), and when set to null on one
+      // that has no other time to fire from.
+      when?: string | null;
+      // Pass null to stop it repeating. Same 400 rule as `when`.
+      recurrence?: QuireRecurrence | null;
+      // Replaces the current list.
+      leads?: QuireReminderLead[];
+      // Pass null to fall back to the default message.
+      name?: string | null;
+    },
+  ): Promise<QuireReminder> {
+    return this.fetch<QuireReminder>(`/reminder/${reminderOid}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  // Permanent — a reminder is not moved to the trash and cannot be restored.
+  async deleteReminder(reminderOid: string): Promise<void> {
+    await this.fetch<void>(`/reminder/${reminderOid}`, { method: "DELETE" });
+  }
+
+}
+
+// ---------------------------------------------------------------------------
+// Reminder helpers (Sep 21 2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Body shared by the three reminder-create endpoints. `members` and
+ * `partner` are create-only and mutually exclusive (400 together).
+ */
+export interface QuireCreateReminderBody {
+  /**
+   * When this reminder fires (UTC, ISO 8601). A plain instant — there is no
+   * all-day reminder, so a bare date means midnight UTC.
+   *
+   * Required when the reminder has no task, or its task has neither a start
+   * nor a due date. Rejected with 400 when the task HAS one of those dates:
+   * the reminder fires from the task's own schedule then, so send `leads`
+   * alone.
+   */
+  when?: string;
+  /** Rejected with 400 on a reminder whose task has a start or due date. */
+  recurrence?: QuireRecurrence;
+  /**
+   * When to notify before the fire time, one notification each. Omit for a
+   * single notification at the fire time (the default, `[{minutes: 0}]`).
+   */
+  leads?: QuireReminderLead[];
+  /** Text shown instead of the default message (Markdown supported). */
+  name?: string;
+  /**
+   * OID of an external team to share this reminder with. Project reminders
+   * only; on a task reminder it must be that task's own team. Cannot be
+   * combined with `members`.
+   */
+  partner?: string;
+  /**
+   * Who can see this reminder, and the only ones it notifies. Omit or pass
+   * null for every member of the owner; `[]` for the owner's admins only; a
+   * list of users (OID, ID, email, or `"me"`) for just those. A non-empty
+   * list must include you, and every entry must be a member of the owner —
+   * otherwise 400. A personal reminder (owner `-`) is always yours alone,
+   * so nobody else can be named.
+   */
+  members?: string[];
+}
+
+export interface QuireReminderListOptions {
+  /**
+   * Page size, 1..1000, or `"no"` for every reminder in one array (the
+   * default when omitted). With a numeric limit, the LAST item of the page
+   * carries a `cursor` when more remain.
+   */
+  limit?: number | "no";
+  /** The previous page's last-item `cursor`, passed back verbatim. */
+  cursor?: string;
+}
+
+function reminderListQuery(options: QuireReminderListOptions): string {
+  const parts: string[] = [];
+  if (options.limit !== undefined) parts.push(`limit=${options.limit}`);
+  if (options.cursor !== undefined)
+    parts.push(`cursor=${encodeURIComponent(options.cursor)}`);
+  return parts.length ? `?${parts.join("&")}` : "";
 }

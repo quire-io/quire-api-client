@@ -626,3 +626,68 @@ export interface QuireComment {
   editedAt?: string;
   [key: string]: unknown;
 }
+
+// ---------------------------------------------------------------------------
+// Reminder — Sep 21 2026
+//
+// A reminder notifies the people it names, either before a task's start or
+// due date, or at a time of its own. `ownerType` is ALWAYS required on the
+// reminder endpoints — unlike sublist / doc / chat / insight / dashboard,
+// there is no implied `project`.
+// ---------------------------------------------------------------------------
+
+export type QuireReminderOwnerType =
+  | "project"
+  | "organization"
+  | "folder"
+  | "smart-folder"
+  | "task";
+
+/**
+ * When to notify, counting back from the fire time. Exactly one of
+ * `minutes` / `days` per entry:
+ *   - `minutes` — an absolute offset, so 30 stays 30 real minutes across a
+ *     daylight-saving transition. There is no `hours`; an hour is 60.
+ *   - `days` — calendar days, so the lead keeps its wall-clock time across
+ *     a DST transition. There is no `weeks`; a week is 7.
+ * `at` ("HH:mm", 24-hour) is only valid with `days`, and is read in the
+ * timezone of the member who created the reminder. Neither field may be
+ * negative (nothing fires after the fire time) or exceed 10,000 days, and
+ * a reminder carries at most 30 leads.
+ */
+export interface QuireReminderLead {
+  minutes?: number;
+  days?: number;
+  at?: string;
+}
+
+export interface QuireReminder {
+  oid: string;
+  // Null when the reminder stands on its own. Only these four fields come
+  // back — fetch the task itself for its dates.
+  task?: { oid: string; id: string; name: string; url?: string } | null;
+  // Null whenever `task` has a start or due date: the reminder then fires
+  // from that date instead, and `leads` counts back from it.
+  when?: string | null;
+  // Always null while the reminder is anchored to a dated task — it then
+  // repeats with the task's own schedule.
+  recurrence?: (QuireRecurrence & { seriesId?: string }) | null;
+  leads?: QuireReminderLead[];
+  name?: string | null;
+  nameText?: string;
+  nameHtml?: string;
+  partner?: unknown;
+  // Tri-state, all three returned explicitly:
+  //   null → every member of the owner can see it
+  //   []   → the owner's admins only
+  //   list → only those users
+  members?: { oid: string; id: string; name: string }[] | null;
+  owner?: unknown;
+  url?: string;
+  createdBy?: { oid: string; id: string; name: string };
+  createdAt?: string;
+  // Present on the LAST item of a `?limit=`-paginated page when more
+  // remain; pass it back as `?cursor=`.
+  cursor?: string;
+  [key: string]: unknown;
+}

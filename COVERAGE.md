@@ -4,7 +4,7 @@
 
 Endpoints wrapped by [`QuireClient`](src/client.ts). Compare against the [Quire REST API docs](https://quire.io/dev/api/) to spot gaps.
 
-Generated from 118 client methods covering 124 endpoints across 24 sections.
+Generated from 127 client methods covering 133 endpoints across 25 sections.
 
 ## User
 
@@ -249,3 +249,17 @@ Generated from 118 client methods covering 124 endpoints across 24 sections.
 | Method | HTTP | Endpoint |
 |---|---|---|
 | `sendNotification` | `POST` | `/api/notification` |
+
+## Reminders (Sep 21 2026)
+
+| Method | HTTP | Endpoint |
+|---|---|---|
+| `createReminder` | `POST` | `/api/reminder/{ownerType}/{ownerOid}[?…]` |
+| `createReminderById` | `POST` | `/api/reminder/id/{ownerType}/{ownerId}[?…]` |
+| `createTaskReminderById` | `POST` | `/api/reminder/id/task/{projectId}/{taskId}[?…]` |
+| `getReminder` | `GET` | `/api/reminder/{reminderOid}` |
+| `listReminders` | `GET` | `/api/reminder/list/{ownerType}/{ownerOid}[?…]` |
+| `listRemindersById` | `GET` | `/api/reminder/list/id/{ownerType}/{ownerId}[?…]` |
+| `listTaskRemindersById` | `GET` | `/api/reminder/list/id/task/{projectId}/{taskId}[?…]` |
+| `updateReminder` | `PUT` | `/api/reminder/{reminderOid}` |
+| `deleteReminder` | `DELETE` | `/api/reminder/{reminderOid}` |

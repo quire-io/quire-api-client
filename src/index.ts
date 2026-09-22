@@ -9,8 +9,10 @@ export type {
   OnAuthRevoked,
 } from "./client.js";
 export type {
+  QuireCreateReminderBody,
   QuireMyTasksFilter,
   QuireMyTasksScope,
+  QuireReminderListOptions,
   QuireTaskSearchParams,
 } from "./client.js";
 
@@ -66,6 +68,9 @@ export type {
   QuireRateLimit,
   QuireRateLimitBucket,
   QuireRecurrence,
+  QuireReminder,
+  QuireReminderLead,
+  QuireReminderOwnerType,
   QuireStatus,
   QuireSublist,
   QuireTag,
