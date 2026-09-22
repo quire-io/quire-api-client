@@ -1,8 +1,12 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 — 2026-09-22
 
-Covers the **Sep 21 2026** server release (zkoss/boeneo#25825).
+First stable release. The client has tracked the Quire REST API through twelve 0.1.x releases without a shape change to `QuireClient`, so the public surface is now committed to under semver.
+
+**Breaking:** `members` is returned as a list of user objects (`{oid, id, name}`) where the server previously returned a list of OID strings — see the entry below. The change is server-side (Sep 21 2026), so it reaches callers on 0.1.12 too; this release declares the new shape in the types.
+
+The first four entries below cover the **Sep 21 2026** server release (zkoss/boeneo#25825); the task-follower and live-test entries after them are independent of it.
 
 - **Reminder API** — nine new endpoints wrapped: `createReminder(ownerType, ownerOid, body)`, `createReminderById`, `createTaskReminderById(projectId, taskId, body)`, `getReminder(oid)`, `listReminders(ownerType, ownerOid, {limit, cursor})`, `listRemindersById`, `listTaskRemindersById`, `updateReminder(oid, body)`, `deleteReminder(oid)`. New exported types `QuireReminder`, `QuireReminderLead`, `QuireReminderOwnerType`, `QuireCreateReminderBody`, `QuireReminderListOptions`.
     - `ownerType` is **always required** — unlike sublist / doc / chat / insight / dashboard, these endpoints have no implied `project`. Pass `"project"` with ownerOid `"-"` for the caller's own inbox.
