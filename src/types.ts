@@ -394,6 +394,15 @@ export interface QuireSublist {
   partner?: unknown;
   createdBy?: { oid: string; id: string; name: string };
   createdAt?: string;
+  // Tri-state visibility (Sep 21 2026). All three states are returned
+  // explicitly, so they can be told apart:
+  //   null → every member of the owner can see this record
+  //   []   → the owner's admins only
+  //   list → only those users
+  // Before Sep 21 2026 this was a list of OID strings; it is now a list of
+  // user objects, matching `followers` / `mutes`. Set it at creation only —
+  // changing it afterwards isn't supported.
+  members?: { oid: string; id: string; name: string }[] | null;
   [key: string]: unknown;
 }
 
@@ -435,6 +444,15 @@ export interface QuireChat {
   mutes?: { oid: string; id: string; name: string }[];
   createdBy?: { oid: string; id: string; name: string };
   createdAt?: string;
+  // Tri-state visibility (Sep 21 2026). All three states are returned
+  // explicitly, so they can be told apart:
+  //   null → every member of the owner can see this record
+  //   []   → the owner's admins only
+  //   list → only those users
+  // Before Sep 21 2026 this was a list of OID strings; it is now a list of
+  // user objects, matching `followers` / `mutes`. Set it at creation only —
+  // changing it afterwards isn't supported.
+  members?: { oid: string; id: string; name: string }[] | null;
   [key: string]: unknown;
 }
 
@@ -464,6 +482,15 @@ export interface QuireDocument {
   mutes?: { oid: string; id: string; name: string }[];
   createdBy?: { oid: string; id: string; name: string };
   createdAt?: string;
+  // Tri-state visibility (Sep 21 2026). All three states are returned
+  // explicitly, so they can be told apart:
+  //   null → every member of the owner can see this record
+  //   []   → the owner's admins only
+  //   list → only those users
+  // Before Sep 21 2026 this was a list of OID strings; it is now a list of
+  // user objects, matching `followers` / `mutes`. Set it at creation only —
+  // changing it afterwards isn't supported.
+  members?: { oid: string; id: string; name: string }[] | null;
   [key: string]: unknown;
 }
 
@@ -497,6 +524,15 @@ export interface QuireDashboard {
   archivedAt?: string;
   createdBy?: { oid: string; id: string; name: string };
   createdAt?: string;
+  // Tri-state visibility (Sep 21 2026). All three states are returned
+  // explicitly, so they can be told apart:
+  //   null → every member of the owner can see this record
+  //   []   → the owner's admins only
+  //   list → only those users
+  // Before Sep 21 2026 this was a list of OID strings; it is now a list of
+  // user objects, matching `followers` / `mutes`. Set it at creation only —
+  // changing it afterwards isn't supported.
+  members?: { oid: string; id: string; name: string }[] | null;
   [key: string]: unknown;
 }
 
@@ -549,6 +585,15 @@ export interface QuireInsight {
   createdBy?: { oid: string; id: string; name: string };
   createdAt?: string;
   editedAt?: string;
+  // Tri-state visibility (Sep 21 2026). All three states are returned
+  // explicitly, so they can be told apart:
+  //   null → every member of the owner can see this record
+  //   []   → the owner's admins only
+  //   list → only those users
+  // Before Sep 21 2026 this was a list of OID strings; it is now a list of
+  // user objects, matching `followers` / `mutes`. Set it at creation only —
+  // changing it afterwards isn't supported.
+  members?: { oid: string; id: string; name: string }[] | null;
   [key: string]: unknown;
 }
 

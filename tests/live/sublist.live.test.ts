@@ -100,4 +100,68 @@ describe.skipIf(!hasTokens)("Live API — /sublist", () => {
 
     await client.deleteSublist(created.oid).catch(() => {});
   });
+
+  // `members` (Sep 21 2026) — create-only, tri-state, and returned as user
+  // objects rather than the OID strings it used to be. All three states come
+  // back explicitly so they can be told apart:
+  //   null → every member of the owner
+  //   []   → the owner's admins only
+  //   list → only those users
+  it("SL5 createSublist without members returns members: null", async () => {
+    const created = await client.createSublist("project", PROJECT_OID, {
+      name: `${runTag}-sublist-members-default`,
+    });
+    try {
+      expect(created.members ?? null).toBeNull();
+    } finally {
+      await client.deleteSublist(created.oid).catch(() => {});
+    }
+  });
+
+  it("SL6 createSublist with members: ['me'] scopes it to that user", async () => {
+    const me = await client.getMe();
+    const created = await client.createSublist("project", PROJECT_OID, {
+      name: `${runTag}-sublist-members-me`,
+      members: ["me"],
+    });
+    try {
+      // User objects now, not OID strings — same shape as `followers`.
+      expect(Array.isArray(created.members)).toBe(true);
+      expect(created.members!.some((m) => m.oid === me.oid)).toBe(true);
+      expect(typeof created.members![0]!.name).toBe("string");
+    } finally {
+      await client.deleteSublist(created.oid).catch(() => {});
+    }
+  });
+
+  it("SL7 createSublist with members: [] means admins only", async () => {
+    const created = await client.createSublist("project", PROJECT_OID, {
+      name: `${runTag}-sublist-members-admins`,
+      members: [],
+    });
+    try {
+      // Empty list echoed back, NOT collapsed to null — that's the whole
+      // point of the tri-state.
+      expect(created.members).toEqual([]);
+    } finally {
+      await client.deleteSublist(created.oid).catch(() => {});
+    }
+  });
+
+  // A non-empty list must include the caller, otherwise they could not see
+  // what they just created. Rejected outright rather than silently repaired.
+  it("SL8 createSublist with a members list excluding the caller is 400", async () => {
+    const res = await rawApi<{ oid?: string }>(
+      "POST",
+      `/sublist/project/${PROJECT_OID}`,
+      {
+        name: `${runTag}-sublist-members-invalid`,
+        members: ["nobody@example.invalid"],
+      },
+    );
+    expect(res.status).toBe(400);
+    if (res.status === 200 && res.data?.oid) {
+      await client.deleteSublist(res.data.oid).catch(() => {});
+    }
+  });
 });

@@ -1565,7 +1565,18 @@ export class QuireClient {
   async createSublist(
     ownerType: string,
     ownerOid: string,
-    body: { name: string; description?: string },
+    body: {
+      name: string;
+      description?: string;
+      // Who can see this record (Sep 21 2026). Omit or pass null for every
+      // member of the owner; `[]` for the owner's admins only; a list of
+      // users (OID, ID, email, or `"me"`) for just those. Every listed user
+      // must be a member of the owner AND the list must include you —
+      // otherwise `400`, rather than the silent drop `assignees` does.
+      // Cannot be combined with `partner` (`400`). Create-only: there is no
+      // way to change it afterwards.
+      members?: string[];
+    },
   ): Promise<QuireSublist> {
     return this.fetch<QuireSublist>(`/sublist/${ownerType}/${ownerOid}`, {
       method: "POST",
@@ -1775,6 +1786,14 @@ export class QuireClient {
       // Jun 4 2026 — only valid when the owner is a project; other owner
       // types return 400. Same value grammar as createChat's `followers`.
       followers?: string[];
+      // Who can see this record (Sep 21 2026). Omit or pass null for every
+      // member of the owner; `[]` for the owner's admins only; a list of
+      // users (OID, ID, email, or `"me"`) for just those. Every listed user
+      // must be a member of the owner AND the list must include you —
+      // otherwise `400`, rather than the silent drop `assignees` does.
+      // Cannot be combined with `partner` (`400`). Create-only: there is no
+      // way to change it afterwards.
+      members?: string[];
     },
   ): Promise<QuireDocument> {
     return this.fetch<QuireDocument>(`/doc/${ownerType}/${ownerOid}`, {
@@ -1835,6 +1854,14 @@ export class QuireClient {
       // `app|team` / `app|/path` syntaxes). The current user is added
       // automatically.
       followers?: string[];
+      // Who can see this record (Sep 21 2026). Omit or pass null for every
+      // member of the owner; `[]` for the owner's admins only; a list of
+      // users (OID, ID, email, or `"me"`) for just those. Every listed user
+      // must be a member of the owner AND the list must include you —
+      // otherwise `400`, rather than the silent drop `assignees` does.
+      // Cannot be combined with `partner` (`400`). Create-only: there is no
+      // way to change it afterwards.
+      members?: string[];
     },
   ): Promise<QuireChat> {
     return this.fetch<QuireChat>(`/chat/${ownerType}/${ownerOid}`, {
@@ -1912,6 +1939,14 @@ export class QuireClient {
       image?: string;
       iconColor?: string;
       id?: string;
+      // Who can see this record (Sep 21 2026). Omit or pass null for every
+      // member of the owner; `[]` for the owner's admins only; a list of
+      // users (OID, ID, email, or `"me"`) for just those. Every listed user
+      // must be a member of the owner AND the list must include you —
+      // otherwise `400`, rather than the silent drop `assignees` does.
+      // Cannot be combined with `partner` (`400`). Create-only: there is no
+      // way to change it afterwards.
+      members?: string[];
     },
   ): Promise<QuireInsight> {
     const path = ownerType === "organization"
@@ -2077,6 +2112,14 @@ export class QuireClient {
       partner?: string;
       start?: string;
       due?: string;
+      // Who can see this record (Sep 21 2026). Omit or pass null for every
+      // member of the owner; `[]` for the owner's admins only; a list of
+      // users (OID, ID, email, or `"me"`) for just those. Every listed user
+      // must be a member of the owner AND the list must include you —
+      // otherwise `400`, rather than the silent drop `assignees` does.
+      // Cannot be combined with `partner` (`400`). Create-only: there is no
+      // way to change it afterwards.
+      members?: string[];
     },
   ): Promise<QuireDashboard> {
     return this.fetch<QuireDashboard>(`/dashboard/${ownerType}/${ownerOid}`, {
@@ -2146,4 +2189,5 @@ export class QuireClient {
       body: JSON.stringify(body),
     });
   }
+
 }

@@ -241,6 +241,30 @@ Notes:
 - Documents are followable only when **project-owned**; sending follower fields for other owner types returns `400`.
 - `searchTasks` has a separate read-side `follower` filter — see [Search filters](#search-filters).
 
+## Record visibility (`members`)
+
+Sublists, documents, chat channels, insights, dashboards and reminders take an optional `members` list at creation, which decides who can see the record. It is a tri-state, and all three states come back explicitly so they can be told apart:
+
+| Sent | Meaning | Returned as |
+|---|---|---|
+| omitted, or `null` | Every member of the owner (the default) | `null` |
+| `[]` | The owner's admins only | `[]` |
+| `["me", "bob@example.com"]` | Only those users | list of user objects |
+
+```ts
+const private = await client.createSublist("project", projectOid, {
+  name: "Q3 planning",
+  members: ["me"],          // only you
+});
+```
+
+Rules worth knowing before you send it:
+
+- **Create-only.** There is no way to change `members` afterwards — recreate the record.
+- Every listed user must already be a member of the owner, and a non-empty list **must include you**. A non-member is rejected with `400` rather than being dropped silently the way a task's `assignees` are.
+- `members` cannot be combined with `partner` — that already shares the record with the whole project and the external team. The pair is `400`.
+- Responses return `members` as user objects (`{ oid, id, name }`), matching `followers` and `mutes`. Before the Sep 21 2026 server release it was a list of OID strings.
+
 ## Errors
 
 | Class | Thrown when |
