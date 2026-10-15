@@ -302,6 +302,25 @@ Reminders are ordered by `oid` — stable, but **not** chronological, so sort cl
 
 `deleteReminder` is **permanent**: a reminder is not moved to the trash and cannot be restored, so there is no undo-remove for it.
 
+## Comment reactions
+
+A comment — on a task or in a chat — carries its emoji reactions as `emojis`: each an `emoji` and the `users` who reacted with it, in the order the apps show them. The field is omitted when there are none.
+
+```ts
+await client.addCommentEmojis(commentOid, ["+1", "tada"]);   // 👍 🎉
+await client.removeCommentEmojis(commentOid, ["👍"]);
+
+const { emojis } = await client.getComment(commentOid);
+// [{ emoji: "🎉", users: [{ oid, id, name }] }]
+```
+
+- Give an emoji as itself or by its GitHub / Slack shortcode, with or without colons and in any case — `"+1"`, `":thumbsup:"` and `"👍"` are the same. Names are the safer choice from scripts: no look-alike characters or missing variation selectors. Responses always return the emoji itself. The full list is in Quire's [Emojis](https://quire.io/dev/api/#emojis) reference.
+- **Add accepts only the 20 emojis Quire's reaction picker offers.** One invalid emoji rejects the whole call with `400` and nothing is written. Remove accepts any value, so a reaction with an emoji the picker no longer offers can still be removed.
+- Both are idempotent and resolve to nothing — read the comment back for the result. At most 20 distinct emojis per call.
+- A reaction always belongs to the authorizing user, never the app. The comment's author is notified of each one added.
+- `addCommentEmojis` on a missing or deleted comment is `404`; `removeCommentEmojis` is a silent no-op, like every delete.
+- The client doesn't validate emojis itself — the server's `400` names the one it rejected. It only refuses an empty list.
+
 ## Errors
 
 | Class | Thrown when |

@@ -624,7 +624,18 @@ export interface QuireComment {
   createdAt?: string;
   editedBy?: { oid: string; id: string; name: string };
   editedAt?: string;
+  // Emoji reactions (Oct 15 2026), in stored order — what the apps show.
+  // Omitted, not `[]`, when there are none.
+  emojis?: QuireCommentEmoji[];
   [key: string]: unknown;
+}
+
+// One reaction on a comment: the emoji itself (never the shortcode it may
+// have been added by) and the users who reacted with it, rendered the same
+// as a task's followers.
+export interface QuireCommentEmoji {
+  emoji: string;
+  users: { oid: string; id: string; name: string }[];
 }
 
 // ---------------------------------------------------------------------------

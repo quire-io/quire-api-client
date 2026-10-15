@@ -254,6 +254,20 @@ function listPagingQuery(options: {
   return parts.length > 0 ? `?${parts.join("&")}` : "";
 }
 
+// The `{emojis}` path segment of /comment/{add|remove}-emoji: each emoji
+// percent-encoded on its own, joined with a literal comma. Blank items are
+// dropped (the server ignores them anyway); a list with nothing left throws
+// here, since the bare `/comment/add-emoji/{oid}/` would only come back as a
+// 400 about the path.
+function encodeCommentEmojis(
+  method: string,
+  emojis: readonly string[],
+): string {
+  const items = emojis.map((e) => e.trim()).filter((e) => e !== "");
+  if (items.length === 0) throw new Error(`${method}: no emoji given`);
+  return items.map(encodeURIComponent).join(",");
+}
+
 export class QuireClient {
   private tokens: QuireTokens;
   private readonly apiServer: string;
@@ -1686,6 +1700,38 @@ export class QuireClient {
   async undoRemoveComment(commentOid: string): Promise<QuireComment> {
     return this.fetch<QuireComment>(`/comment/undo-remove/${commentOid}`, {
       method: "PUT",
+    });
+  }
+
+  // Emoji reactions (Oct 15 2026). The emojis ride in the URL path as one
+  // comma list, each the emoji itself or its GitHub / Slack shortcode (`+1`,
+  // `:tada:`, any case). Both are all-or-nothing (one bad emoji → 400,
+  // nothing written), take at most 20 distinct emojis, act for the
+  // authorizing user only, and return 204 — read the comment for the result.
+  // Add accepts only the 20 emojis Quire's reaction picker offers; remove
+  // accepts any non-empty value so a legacy reaction can still go. No
+  // client-side validation beyond an empty list: the server's 400 names the
+  // emoji it rejected. Verified by CE1-CE16 in
+  // tests/live/comment-emoji.live.test.ts.
+  async addCommentEmojis(
+    commentOid: string,
+    emojis: readonly string[],
+  ): Promise<void> {
+    const emojiList = encodeCommentEmojis("addCommentEmojis", emojis);
+    await this.fetch<void>(`/comment/add-emoji/${commentOid}/${emojiList}`, {
+      method: "POST",
+    });
+  }
+
+  // Unlike add, a missing or deleted comment is a 204 no-op rather than a
+  // 404 — the same as every DELETE (CE11 / CE12).
+  async removeCommentEmojis(
+    commentOid: string,
+    emojis: readonly string[],
+  ): Promise<void> {
+    const emojiList = encodeCommentEmojis("removeCommentEmojis", emojis);
+    await this.fetch<void>(`/comment/remove-emoji/${commentOid}/${emojiList}`, {
+      method: "DELETE",
     });
   }
 

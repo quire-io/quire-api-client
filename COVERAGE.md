@@ -4,7 +4,7 @@
 
 Endpoints wrapped by [`QuireClient`](src/client.ts). Compare against the [Quire REST API docs](https://quire.io/dev/api/) to spot gaps.
 
-Generated from 127 client methods covering 133 endpoints across 25 sections.
+Generated from 129 client methods covering 135 endpoints across 25 sections.
 
 ## User
 
@@ -161,6 +161,8 @@ Generated from 127 client methods covering 133 endpoints across 25 sections.
 | `updateComment` | `PUT` | `/api/comment/{commentOid}[?…]` |
 | `deleteComment` | `DELETE` | `/api/comment/{commentOid}` |
 | `undoRemoveComment` | `PUT` | `/api/comment/undo-remove/{commentOid}` |
+| `addCommentEmojis` | `POST` | `/api/comment/add-emoji/{commentOid}/{emojiList}` |
+| `removeCommentEmojis` | `DELETE` | `/api/comment/remove-emoji/{commentOid}/{emojiList}` |
 
 ## Statuses
 

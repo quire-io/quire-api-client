@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+Covers the **Oct 15 2026** server release.
+
+- **Comment emoji reactions** (zkoss/boeneo#26000) — `addCommentEmojis(commentOid, emojis)` and `removeCommentEmojis(commentOid, emojis)` wrap `POST /comment/add-emoji/{commentOid}/{emojis}` and `DELETE /comment/remove-emoji/{commentOid}/{emojis}`. `QuireComment.emojis` (new exported type `QuireCommentEmoji`) carries a comment's reactions on every read — get, list, create, update and undo-remove — and is omitted when there are none.
+    - An emoji can be the emoji itself or its GitHub / Slack shortcode (`+1`, `:tada:`, any case); the client percent-encodes each and joins them with commas. Responses always return the emoji itself.
+    - All or nothing: an add with any emoji outside the 20 Quire's reaction picker offers is rejected with `400` and writes nothing. At most 20 distinct emojis per call. Both resolve to `undefined` (`204`) — read the comment for the result. An empty list throws before any request; nothing else is validated client-side.
+    - `removeCommentEmojis` on a missing or deleted comment is a `204` no-op like every delete, not the `404` the API doc listed (quire-api/quire-api#78). Covered by CE1-CE16 in `tests/live/comment-emoji.live.test.ts`.
+
 ## 1.0.0 — 2026-09-22
 
 First stable release. The client has tracked the Quire REST API through twelve 0.1.x releases without a shape change to `QuireClient`, so the public surface is now committed to under semver.

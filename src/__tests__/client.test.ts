@@ -793,3 +793,59 @@ describe("chat/doc follower fields (Jun 4 2026)", () => {
     });
   });
 });
+
+describe("comment emoji reactions (Oct 15 2026)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  it("addCommentEmojis POSTs each emoji percent-encoded and comma-joined, with no body", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await expect(
+      mkClient().addCommentEmojis("oid-c1", ["👍", "+1", ":tada:"]),
+    ).resolves.toBeUndefined();
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe(
+      "https://quire.io/api/comment/add-emoji/oid-c1/%F0%9F%91%8D,%2B1,%3Atada%3A",
+    );
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeUndefined();
+  });
+
+  it("removeCommentEmojis DELETEs /comment/remove-emoji/{oid}/{emojis}", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await mkClient().removeCommentEmojis("oid-c1", ["❤️", "legacy"]);
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit];
+    expect(url).toBe(
+      "https://quire.io/api/comment/remove-emoji/oid-c1/%E2%9D%A4%EF%B8%8F,legacy",
+    );
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("drops blank items, and rejects a list with nothing left before any request", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await mkClient().addCommentEmojis("oid-c1", [" rocket ", "", "  "]);
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      "https://quire.io/api/comment/add-emoji/oid-c1/rocket",
+    );
+
+    await expect(mkClient().addCommentEmojis("oid-c1", [])).rejects.toThrow(
+      "addCommentEmojis: no emoji given",
+    );
+    await expect(
+      mkClient().removeCommentEmojis("oid-c1", ["", " "]),
+    ).rejects.toThrow("removeCommentEmojis: no emoji given");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

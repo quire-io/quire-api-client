@@ -55,6 +55,7 @@ export type {
   QuireAttachment,
   QuireChat,
   QuireComment,
+  QuireCommentEmoji,
   QuireCompactRef,
   QuireDashboard,
   QuireDashboardOwnerType,
