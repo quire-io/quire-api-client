@@ -16,6 +16,9 @@ Covers the **Oct 15 2026** server release.
     - `viewMembers` / `editMembers`: user refs in, user objects out. `[]` means the admins only, `null` lifts the restriction, and absent in a response means none. An admin not named sees the definition but not the values: the API leaves the field out of tasks, a write to it is `400`, and searching on it is an unknown query parameter (`400`).
     - `locked` stops editing in Quire only — API writes still go through. `editMembers` does apply to the API.
     - `private` is a choice only without `viewMembers` (`false` with it is `400`), and clearing `viewMembers` leaves the field private. Like the other field flags, `private` and `locked` are returned only when true. Covered by PF1-PF7 in the new `tests/live/project-field.live.test.ts`; PF6-PF7 need `QUIRE_TEST_COLLEAGUE_EMAIL`.
+- **Task search cursors** — documented on `QuireTaskSearchParams.cursor` and in the README; no code change.
+    - A `sublist` search no longer puts a `cursor` on its last item, which was rejected with `400` when passed back. It is a single page, so pass a `limit` big enough, or `"no"`. Covered by TPG5 in `tests/live/task-pagination.live.test.ts`.
+    - A cursor reaches at most 1,000,000 rows deep; a deeper one is `400`.
 
 ## 1.0.0 — 2026-09-22
 

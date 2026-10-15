@@ -167,7 +167,10 @@ Other custom-field types are exact match — `Email` / `Hyperlink` also accept `
 
 ### Pagination
 
-Pair `limit` (integer, or `"no"` for unlimited; free-plan cap is 30) with `cursor`. The last item of each page carries a `cursor` field; pass it as the next request's `cursor` (with the same `limit` and filters) to fetch the next page. The absence of `cursor` on the final item signals end of stream. `cursor` cannot combine with `sublist` (400).
+Pair `limit` (integer, or `"no"` for unlimited; free-plan cap is 30) with `cursor`. The last item of each page carries a `cursor` field; pass it as the next request's `cursor` (with the same `limit` and filters) to fetch the next page. The absence of `cursor` on the final item signals end of stream.
+
+- A cursor reaches at most **1,000,000 rows** deep; a deeper one is `400`. Narrow the search with filters instead.
+- A `sublist` search is never paged: it returns no `cursor`, and `cursor` can't be combined with `sublist` (`400`). Pass a `limit` big enough, or `"no"`, to get every match.
 
 ### Examples
 

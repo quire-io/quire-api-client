@@ -1,6 +1,6 @@
 /**
  * Live API tests for cursor pagination on /task/list and /task/search
- * (TPG1-TPG4).
+ * (TPG1-TPG5).
  *
  * Wire shape: with `?limit=N` and more results to come, the LAST item in
  * the response carries `"cursor": "<token>"`. Pass it back as
@@ -11,6 +11,7 @@
  * Scope:
  *   TPG1/TPG2 — /task/list under a parent task (small fixture).
  *   TPG3/TPG4 — /task/search filtered by a fresh tag.
+ *   TPG5      — /task/search?sublist=, which is never paged (Oct 15 2026).
  *
  * Negative cases (cursor + sublist on search → 400, cursor + depth>1 on
  * list → 400) are out-of-scope.
@@ -103,5 +104,34 @@ describe.skipIf(!hasTokens)("Live API — cursor pagination", () => {
     expect(page2.length).toBe(1);
     expect(page2[0]!.cursor).toBeUndefined();
     expect(childOids).toContain(page2[0]!.oid);
+  });
+
+  // Oct 15 2026: a ?sublist= search no longer puts a cursor on its last
+  // item — passing one back was always 400 — so it is a single page. Ask
+  // for a big enough `limit`, or "no", to get every match.
+  it("TPG5 searchTasks({sublist, limit:2}) carries no cursor; limit \"no\" returns every match", async () => {
+    const sublist = await client.createSublist("project", PROJECT_OID, {
+      name: `${runTag}-tpg-sublist`,
+    });
+    try {
+      await client.updateSublistMembership(
+        sublist.oid,
+        childOids.map((task) => ({ task })),
+      );
+      const capped = (await client.searchTasks(PROJECT_OID, {
+        sublist: sublist.oid,
+        limit: 2,
+      })) as CursorTask[];
+      expect(capped.length).toBe(2);
+      expect(capped.every((t) => t.cursor === undefined)).toBe(true);
+
+      const all = await client.searchTasks(PROJECT_OID, {
+        sublist: sublist.oid,
+        limit: "no",
+      });
+      expect(all.map((t) => t.oid).sort()).toEqual([...childOids].sort());
+    } finally {
+      await client.deleteSublist(sublist.oid).catch(() => {});
+    }
   });
 });

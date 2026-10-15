@@ -109,8 +109,12 @@ export interface QuireTaskSearchParams {
   limit?: number | string;
   /**
    * Apr 27 2026 cursor pagination — token from the previous page's
-   * last-item `cursor` field. Cannot combine with `sublist=` (400). Pair
-   * with the same `limit` and any other filter on subsequent calls.
+   * last-item `cursor` field. Pair with the same `limit` and any other
+   * filter on subsequent calls. Reaches at most 1,000,000 rows deep; a
+   * deeper one is 400, so narrow the search with filters instead.
+   * Cannot combine with `sublist=` (400) — and since Oct 15 2026 a
+   * `sublist=` search returns no cursor to pass back: ask for a `limit` big
+   * enough, or `"no"`, to get every match.
    */
   cursor?: string;
   /** Project-scope only: filter to tasks in one sublist by its OID. */
