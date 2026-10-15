@@ -20,6 +20,7 @@ import type {
   QuireAttachment,
   QuireComment,
   QuireCompactRef,
+  QuireFieldAccess,
   QuireFieldDefinition,
   QuireInsight,
   QuireOrganization,
@@ -593,9 +594,11 @@ export class QuireClient {
   // under `fields` keyed by name.
   // -----------------------------------------------------------------------
 
+  // `QuireFieldAccess` (Oct 15 2026) types who can view and edit the values;
+  // everything else type-specific stays in the catch-all.
   async addProjectField(
     projectOid: string,
-    body: { name: string; type: string; [key: string]: unknown },
+    body: { name: string; type: string; [key: string]: unknown } & QuireFieldAccess,
   ): Promise<QuireFieldDefinition> {
     return this.fetch<QuireFieldDefinition>(`/project/add-field/${projectOid}`, {
       method: "POST",
@@ -608,7 +611,7 @@ export class QuireClient {
   async updateProjectField(
     projectOid: string,
     fieldName: string,
-    body: Record<string, unknown>,
+    body: QuireFieldAccess & Record<string, unknown>,
   ): Promise<QuireFieldDefinition> {
     return this.fetch<QuireFieldDefinition>(
       `/project/update-field/${projectOid}/${encodeURIComponent(fieldName)}`,
@@ -2103,7 +2106,7 @@ export class QuireClient {
 
   async addInsightField(
     insightOid: string,
-    body: { name: string; type: string; [key: string]: unknown },
+    body: { name: string; type: string; [key: string]: unknown } & QuireFieldAccess,
   ): Promise<QuireFieldDefinition> {
     return this.fetch<QuireFieldDefinition>(`/insight/add-field/${insightOid}`, {
       method: "POST",
@@ -2114,7 +2117,7 @@ export class QuireClient {
   async updateInsightField(
     insightOid: string,
     fieldName: string,
-    body: Record<string, unknown>,
+    body: QuireFieldAccess & Record<string, unknown>,
   ): Promise<QuireFieldDefinition> {
     return this.fetch<QuireFieldDefinition>(
       `/insight/update-field/${insightOid}/${encodeURIComponent(fieldName)}`,

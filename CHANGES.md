@@ -12,6 +12,10 @@ Covers the **Oct 15 2026** server release.
     - A choice only while `members` and `partner` are both null; defaults to `false` and can be changed later, unlike `members`. It is returned only then.
     - With `members` or `partner` set the record is always hidden from them: `private` is absent from the response, `true` is a no-op and `false` is `400`. Covered by SL9-SL11 in `tests/live/sublist.live.test.ts`.
 - **README:** the `members` example assigned to `const private`, a reserved word in strict mode; renamed.
+- **Custom field access** — `QuireFieldDefinition` declares `viewMembers`, `editMembers` and `locked`, and `addProjectField` / `updateProjectField` / `addInsightField` / `updateInsightField` type them on the way in through the new exported `QuireFieldAccess`. The bodies still accept any other key, so existing callers compile unchanged.
+    - `viewMembers` / `editMembers`: user refs in, user objects out. `[]` means the admins only, `null` lifts the restriction, and absent in a response means none. An admin not named sees the definition but not the values: the API leaves the field out of tasks, a write to it is `400`, and searching on it is an unknown query parameter (`400`).
+    - `locked` stops editing in Quire only — API writes still go through. `editMembers` does apply to the API.
+    - `private` is a choice only without `viewMembers` (`false` with it is `400`), and clearing `viewMembers` leaves the field private. Like the other field flags, `private` and `locked` are returned only when true. Covered by PF1-PF7 in the new `tests/live/project-field.live.test.ts`; PF6-PF7 need `QUIRE_TEST_COLLEAGUE_EMAIL`.
 
 ## 1.0.0 — 2026-09-22
 

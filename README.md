@@ -278,6 +278,33 @@ await client.updateDocument(docOid, { private: false });   // guests can see it 
 - It is returned only while it is a choice. A record with `members` or a `partner` is always hidden from guests and visitors, so `private` is absent from its response, `true` is accepted as a no-op, and `false` is `400`.
 - Reminders don't have it.
 
+## Custom field access
+
+A custom field can limit who sees and edits its values. `addProjectField` / `updateProjectField` type these keys as `QuireFieldAccess`, and `addInsightField` / `updateInsightField` take the same:
+
+```ts
+await client.addProjectField(projectOid, {
+  name: "Salary",
+  type: "money",
+  viewMembers: ["me", "hr@example.com"],   // only these users see the values
+  editMembers: ["hr@example.com"],         // and only HR can change them
+});
+
+// Read-only in Quire, but still writable from your sync job
+await client.updateProjectField(projectOid, "External ID", { locked: true });
+```
+
+| Key | Sent | Returned on `QuireFieldDefinition` |
+|---|---|---|
+| `viewMembers` | user refs (OID, ID, email, `"me"`); `[]` = admins only; `null` lifts it | user objects; absent = no restriction |
+| `editMembers` | same; editing also requires viewing | user objects; absent = anyone who can edit the task |
+| `locked` | `true` stops everyone editing the values **in Quire**, admins included | `true`, or absent |
+
+- An admin not named in `viewMembers` still sees the definition, but not the values: the API leaves the field out of the tasks it returns. Writing a field the caller can't edit is `400`, and a field the caller can't view is an unknown `searchTasks` parameter (`400`).
+- `locked` doesn't apply to the API — your writes still go through. `editMembers` does.
+- `private` (hidden from guests and public visitors) is a choice only without `viewMembers`: with it the field is always hidden from them, so `private: false` is `400`. Clearing `viewMembers` later leaves the field private.
+- Like the other field flags, `private` and `locked` come back only when `true`.
+
 ## Reminders
 
 A reminder notifies the people it names, either before a task's start/due date or at a time of its own. Unlike every other work endpoint, **`ownerType` is always required** — there is no implied `project`.

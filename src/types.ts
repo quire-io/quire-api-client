@@ -148,11 +148,41 @@ export interface QuireFieldDefinition {
       | `user` | `task` | `hyperlink` | `email` | `formula` | `file` | `lookup` */
   type: string;
   hidden?: boolean;
+  // Hidden from guests and from the visitors of a public project or of a
+  // share link. Like the other flags here, returned only when true. A choice
+  // only without `viewMembers` (Oct 15 2026): with it the field is always
+  // hidden from them, so it isn't returned. Clearing `viewMembers` leaves
+  // the field private.
   private?: boolean;
   percent?: boolean;
   clearOnDup?: boolean;
   multiple?: boolean;
+  // Who can view / edit the values (Oct 15 2026), as user objects. Absent
+  // means no restriction — everyone `private` allows / anyone who can edit
+  // the task; `[]` means the admins only. An admin not named still sees
+  // the definition, but not the values, and can't write them.
+  viewMembers?: { oid: string; id: string; name: string }[];
+  editMembers?: { oid: string; id: string; name: string }[];
+  // No one can edit the values in Quire, admins included; the API still
+  // can, e.g. to push values from another system.
+  locked?: boolean;
   [key: string]: unknown;
+}
+
+// Who can see and edit a custom field's values (Oct 15 2026) — the write
+// side, accepted by add-field and update-field on projects and insights.
+// Users are an OID, ID, email or "me", and must be members of the field's
+// owner (an external team's members included). `[]` means the admins only;
+// null lifts the restriction. Returned on `QuireFieldDefinition`.
+export interface QuireFieldAccess {
+  // A choice only without `viewMembers`; with it the field is always hidden
+  // from guests and public visitors, so `false` is 400.
+  private?: boolean;
+  viewMembers?: string[] | null;
+  // Editing also requires viewing. Unlike `locked`, this applies to API
+  // writes too: a write to a field the caller can't edit is 400.
+  editMembers?: string[] | null;
+  locked?: boolean;
 }
 
 // ---------------------------------------------------------------------------

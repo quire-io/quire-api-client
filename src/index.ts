@@ -61,6 +61,7 @@ export type {
   QuireDashboardOwnerType,
   QuireDocument,
   QuireEnumValue,
+  QuireFieldAccess,
   QuireFieldDefinition,
   QuireInsight,
   QuireOrganization,

@@ -63,6 +63,10 @@ npm run test:live:prepare
    `recipients` fan-out path. "Visible to the app" means either a same-org
    colleague who has also authorized this app, or any colleague if the app
    holds the contacts scope. Without it, N4 skips (N1–N3 and N5 still run).
+   PF6–PF7 in [project-field.live.test.ts](project-field.live.test.ts) use
+   it too, as a `viewMembers` / `editMembers` entry that isn't you — so the
+   colleague must also be a member of the test project. Without it, PF6–PF7
+   skip.
 
 ## First-time setup
 
