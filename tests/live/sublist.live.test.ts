@@ -1,5 +1,6 @@
 /**
- * Live API tests for /sublist (SL1, SL2, SL2a, SL2b, SL2c, SL3, SL4).
+ * Live API tests for /sublist (SL1-SL4, `members` SL5-SL8, `private`
+ * SL9-SL11).
  *
  * Membership note: adding/removing tasks goes through PUT /sublist/{oid}
  * with `{ changes: [{ task, exclude? }] }`, NOT /task/move (which only
@@ -160,6 +161,73 @@ describe.skipIf(!hasTokens)("Live API — /sublist", () => {
       },
     );
     expect(res.status).toBe(400);
+    if (res.status === 200 && res.data?.oid) {
+      await client.deleteSublist(res.data.oid).catch(() => {});
+    }
+  });
+
+  // `private` (Oct 15 2026) hides a record from guests and from the visitors
+  // of a public project or share link. It is a choice only while `members`
+  // and `partner` are both null; with either set the record is always hidden
+  // from them. Docs, chats, insights and dashboards share the rule (the same
+  // probes against docs returned the same results).
+  it("SL9 createSublist returns private: false by default and honours private: true", async () => {
+    const plain = await client.createSublist("project", PROJECT_OID, {
+      name: `${runTag}-sublist-public`,
+    });
+    const hidden = await client.createSublist("project", PROJECT_OID, {
+      name: `${runTag}-sublist-private`,
+      private: true,
+    });
+    try {
+      expect(plain.private).toBe(false);
+      expect(hidden.private).toBe(true);
+      expect((await client.getSublist(hidden.oid)).private).toBe(true);
+    } finally {
+      await client.deleteSublist(plain.oid).catch(() => {});
+      await client.deleteSublist(hidden.oid).catch(() => {});
+    }
+  });
+
+  it("SL10 updateSublist turns private on and off", async () => {
+    const created = await client.createSublist("project", PROJECT_OID, {
+      name: `${runTag}-sublist-private-toggle`,
+    });
+    try {
+      const on = await client.updateSublist(created.oid, { private: true });
+      expect(on.private).toBe(true);
+      const off = await client.updateSublist(created.oid, { private: false });
+      expect(off.private).toBe(false);
+    } finally {
+      await client.deleteSublist(created.oid).catch(() => {});
+    }
+  });
+
+  // With `members` set, `private` isn't returned at all, `true` is accepted
+  // as a no-op, and `false` is rejected — the record can't be shown to guests.
+  it("SL11 with members, private is absent from the response and false is 400", async () => {
+    const created = await client.createSublist("project", PROJECT_OID, {
+      name: `${runTag}-sublist-members-private`,
+      members: ["me"],
+      private: true,
+    });
+    try {
+      expect(created.private).toBeUndefined();
+    } finally {
+      await client.deleteSublist(created.oid).catch(() => {});
+    }
+
+    const res = await rawApi<{ oid?: string; message?: string }>(
+      "POST",
+      `/sublist/project/${PROJECT_OID}`,
+      {
+        name: `${runTag}-sublist-members-public`,
+        members: [],
+        private: false,
+      },
+    );
+    expect(res.status).toBe(400);
+    expect(res.data?.message).toContain("private");
     if (res.status === 200 && res.data?.oid) {
       await client.deleteSublist(res.data.oid).catch(() => {});
     }

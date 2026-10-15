@@ -241,7 +241,7 @@ Notes:
 - Documents are followable only when **project-owned**; sending follower fields for other owner types returns `400`.
 - `searchTasks` has a separate read-side `follower` filter — see [Search filters](#search-filters).
 
-## Record visibility (`members`)
+## Record visibility (`members`, `private`)
 
 Sublists, documents, chat channels, insights, dashboards and reminders take an optional `members` list at creation, which decides who can see the record. It is a tri-state, and all three states come back explicitly so they can be told apart:
 
@@ -252,7 +252,7 @@ Sublists, documents, chat channels, insights, dashboards and reminders take an o
 | `["me", "bob@example.com"]` | Only those users | list of user objects |
 
 ```ts
-const private = await client.createSublist("project", projectOid, {
+const mine = await client.createSublist("project", projectOid, {
   name: "Q3 planning",
   members: ["me"],          // only you
 });
@@ -264,6 +264,19 @@ Rules worth knowing before you send it:
 - Every listed user must already be a member of the owner, and a non-empty list **must include you**. A non-member is rejected with `400` rather than being dropped silently the way a task's `assignees` are.
 - `members` cannot be combined with `partner` — that already shares the record with the whole project and the external team. The pair is `400`.
 - Responses return `members` as user objects (`{ oid, id, name }`), matching `followers` and `mutes`. Before the Sep 21 2026 server release it was a list of OID strings.
+
+### Hiding from guests and public visitors (`private`)
+
+Sublists, documents, chat channels, insights and dashboards also take `private`, which hides the record from guests and from the visitors of a public project or of a share link — the same switch a custom field has. It is a choice only while every member can see the record (`members` is `null` and there is no `partner`):
+
+```ts
+await client.createDocument("project", projectOid, { name: "Salaries", private: true });
+await client.updateDocument(docOid, { private: false });   // guests can see it again
+```
+
+- Defaults to `false`, and unlike `members` it **can be changed** afterwards with the `update*` methods.
+- It is returned only while it is a choice. A record with `members` or a `partner` is always hidden from guests and visitors, so `private` is absent from its response, `true` is accepted as a no-op, and `false` is `400`.
+- Reminders don't have it.
 
 ## Reminders
 

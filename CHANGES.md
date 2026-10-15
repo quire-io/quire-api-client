@@ -8,6 +8,10 @@ Covers the **Oct 15 2026** server release.
     - An emoji can be the emoji itself or its GitHub / Slack shortcode (`+1`, `:tada:`, any case); the client percent-encodes each and joins them with commas. Responses always return the emoji itself.
     - All or nothing: an add with any emoji outside the 20 Quire's reaction picker offers is rejected with `400` and writes nothing. At most 20 distinct emojis per call. Both resolve to `undefined` (`204`) — read the comment for the result. An empty list throws before any request; nothing else is validated client-side.
     - `removeCommentEmojis` on a missing or deleted comment is a `204` no-op like every delete, not the `404` the API doc listed (quire-api/quire-api#78). Covered by CE1-CE16 in `tests/live/comment-emoji.live.test.ts`.
+- **`private` on works** — `createSublist` / `updateSublist`, `createDocument` / `updateDocument`, `createChat` / `updateChat`, `createInsight` / `updateInsight` and `createDashboard` / `updateDashboard` accept `private?: boolean`, and `QuireSublist`, `QuireDocument`, `QuireChat`, `QuireInsight` and `QuireDashboard` declare it. When true, guests and the visitors of a public project or of a share link don't see the record — like a custom field's `private`.
+    - A choice only while `members` and `partner` are both null; defaults to `false` and can be changed later, unlike `members`. It is returned only then.
+    - With `members` or `partner` set the record is always hidden from them: `private` is absent from the response, `true` is a no-op and `false` is `400`. Covered by SL9-SL11 in `tests/live/sublist.live.test.ts`.
+- **README:** the `members` example assigned to `const private`, a reserved word in strict mode; renamed.
 
 ## 1.0.0 — 2026-09-22
 

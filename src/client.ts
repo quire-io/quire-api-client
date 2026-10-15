@@ -1593,6 +1593,11 @@ export class QuireClient {
       // Cannot be combined with `partner` (`400`). Create-only: there is no
       // way to change it afterwards.
       members?: string[];
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
     },
   ): Promise<QuireSublist> {
     return this.fetch<QuireSublist>(`/sublist/${ownerType}/${ownerOid}`, {
@@ -1609,6 +1614,11 @@ export class QuireClient {
       start?: string;
       due?: string;
       archived?: boolean;
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
     },
   ): Promise<QuireSublist> {
     return this.fetch<QuireSublist>(`/sublist/${sublistOid}`, {
@@ -1843,6 +1853,11 @@ export class QuireClient {
       // Cannot be combined with `partner` (`400`). Create-only: there is no
       // way to change it afterwards.
       members?: string[];
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
     },
   ): Promise<QuireDocument> {
     return this.fetch<QuireDocument>(`/doc/${ownerType}/${ownerOid}`, {
@@ -1857,6 +1872,11 @@ export class QuireClient {
       name?: string;
       description?: string;
       archived?: boolean;
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
       // Jun 4 2026 — only valid on project-owned documents (400 otherwise).
       // `followers` replaces the whole list; the delta forms add/remove.
       followers?: string[];
@@ -1911,6 +1931,11 @@ export class QuireClient {
       // Cannot be combined with `partner` (`400`). Create-only: there is no
       // way to change it afterwards.
       members?: string[];
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
     },
   ): Promise<QuireChat> {
     return this.fetch<QuireChat>(`/chat/${ownerType}/${ownerOid}`, {
@@ -1934,6 +1959,11 @@ export class QuireClient {
       name?: string;
       description?: string;
       archived?: boolean;
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
       // `followers` replaces the whole list (Jun 4 2026); the delta forms
       // add/remove without touching the rest.
       followers?: string[];
@@ -1996,6 +2026,11 @@ export class QuireClient {
       // Cannot be combined with `partner` (`400`). Create-only: there is no
       // way to change it afterwards.
       members?: string[];
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
     },
   ): Promise<QuireInsight> {
     const path = ownerType === "organization"
@@ -2015,6 +2050,11 @@ export class QuireClient {
       image?: string;
       iconColor?: string;
       archived?: boolean;
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
     },
   ): Promise<QuireInsight> {
     return this.fetch<QuireInsight>(`/insight/${insightOid}`, {
@@ -2169,6 +2209,11 @@ export class QuireClient {
       // Cannot be combined with `partner` (`400`). Create-only: there is no
       // way to change it afterwards.
       members?: string[];
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
     },
   ): Promise<QuireDashboard> {
     return this.fetch<QuireDashboard>(`/dashboard/${ownerType}/${ownerOid}`, {
@@ -2190,6 +2235,11 @@ export class QuireClient {
       start?: string | null;
       due?: string | null;
       archived?: boolean;
+      // Hide this record from guests and from the visitors of a public
+      // project or of a share link (Oct 15 2026). A choice only while
+      // `members` and `partner` are both null (default false); with either
+      // set it is always hidden, so `false` is `400` and `true` a no-op.
+      private?: boolean;
     },
   ): Promise<QuireDashboard> {
     return this.fetch<QuireDashboard>(`/dashboard/${dashboardOid}`, {

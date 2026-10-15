@@ -403,6 +403,13 @@ export interface QuireSublist {
   // user objects, matching `followers` / `mutes`. Set it at creation only —
   // changing it afterwards isn't supported.
   members?: { oid: string; id: string; name: string }[] | null;
+  // Hidden from guests and from the visitors of a public project or of a
+  // share link (Oct 15 2026), like a custom field's `private`. Present only
+  // when `members` and `partner` are both null — the one case where it's a
+  // choice (default false). Absent otherwise: a record shared with an
+  // external team, with selected members or with the admins only is always
+  // hidden from them.
+  private?: boolean;
   [key: string]: unknown;
 }
 
@@ -453,6 +460,13 @@ export interface QuireChat {
   // user objects, matching `followers` / `mutes`. Set it at creation only —
   // changing it afterwards isn't supported.
   members?: { oid: string; id: string; name: string }[] | null;
+  // Hidden from guests and from the visitors of a public project or of a
+  // share link (Oct 15 2026), like a custom field's `private`. Present only
+  // when `members` and `partner` are both null — the one case where it's a
+  // choice (default false). Absent otherwise: a record shared with an
+  // external team, with selected members or with the admins only is always
+  // hidden from them.
+  private?: boolean;
   [key: string]: unknown;
 }
 
@@ -491,6 +505,13 @@ export interface QuireDocument {
   // user objects, matching `followers` / `mutes`. Set it at creation only —
   // changing it afterwards isn't supported.
   members?: { oid: string; id: string; name: string }[] | null;
+  // Hidden from guests and from the visitors of a public project or of a
+  // share link (Oct 15 2026), like a custom field's `private`. Present only
+  // when `members` and `partner` are both null — the one case where it's a
+  // choice (default false). Absent otherwise: a record shared with an
+  // external team, with selected members or with the admins only is always
+  // hidden from them.
+  private?: boolean;
   [key: string]: unknown;
 }
 
@@ -533,6 +554,13 @@ export interface QuireDashboard {
   // user objects, matching `followers` / `mutes`. Set it at creation only —
   // changing it afterwards isn't supported.
   members?: { oid: string; id: string; name: string }[] | null;
+  // Hidden from guests and from the visitors of a public project or of a
+  // share link (Oct 15 2026), like a custom field's `private`. Present only
+  // when `members` and `partner` are both null — the one case where it's a
+  // choice (default false). Absent otherwise: a record shared with an
+  // external team, with selected members or with the admins only is always
+  // hidden from them.
+  private?: boolean;
   [key: string]: unknown;
 }
 
@@ -594,6 +622,13 @@ export interface QuireInsight {
   // user objects, matching `followers` / `mutes`. Set it at creation only —
   // changing it afterwards isn't supported.
   members?: { oid: string; id: string; name: string }[] | null;
+  // Hidden from guests and from the visitors of a public project or of a
+  // share link (Oct 15 2026), like a custom field's `private`. Present only
+  // when `members` and `partner` are both null — the one case where it's a
+  // choice (default false). Absent otherwise: a record shared with an
+  // external team, with selected members or with the admins only is always
+  // hidden from them.
+  private?: boolean;
   [key: string]: unknown;
 }
 
