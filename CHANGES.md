@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 — 2026-10-16
 
-Covers the **Oct 15 2026** server release.
+Covers the **Oct 15 2026** server release. Everything is additive: new methods, new optional fields and wider body types, so existing callers compile and behave as before. The release's reminder rules for public-project visitors and guests are server-side only and need nothing here.
 
 - **Comment emoji reactions** (zkoss/boeneo#26000) — `addCommentEmojis(commentOid, emojis)` and `removeCommentEmojis(commentOid, emojis)` wrap `POST /comment/add-emoji/{commentOid}/{emojis}` and `DELETE /comment/remove-emoji/{commentOid}/{emojis}`. `QuireComment.emojis` (new exported type `QuireCommentEmoji`) carries a comment's reactions on every read — get, list, create, update and undo-remove — and is omitted when there are none.
     - An emoji can be the emoji itself or its GitHub / Slack shortcode (`+1`, `:tada:`, any case); the client percent-encodes each and joins them with commas. Responses always return the emoji itself.
@@ -11,7 +11,6 @@ Covers the **Oct 15 2026** server release.
 - **`private` on works** — `createSublist` / `updateSublist`, `createDocument` / `updateDocument`, `createChat` / `updateChat`, `createInsight` / `updateInsight` and `createDashboard` / `updateDashboard` accept `private?: boolean`, and `QuireSublist`, `QuireDocument`, `QuireChat`, `QuireInsight` and `QuireDashboard` declare it. When true, guests and the visitors of a public project or of a share link don't see the record — like a custom field's `private`.
     - A choice only while `members` and `partner` are both null; defaults to `false` and can be changed later, unlike `members`. It is returned only then.
     - With `members` or `partner` set the record is always hidden from them: `private` is absent from the response, `true` is a no-op and `false` is `400`. Covered by SL9-SL11 in `tests/live/sublist.live.test.ts`.
-- **README:** the `members` example assigned to `const private`, a reserved word in strict mode; renamed.
 - **Custom field access** — `QuireFieldDefinition` declares `viewMembers`, `editMembers` and `locked`, and `addProjectField` / `updateProjectField` / `addInsightField` / `updateInsightField` type them on the way in through the new exported `QuireFieldAccess`. The bodies still accept any other key, so existing callers compile unchanged.
     - `viewMembers` / `editMembers`: user refs in, user objects out. `[]` means the admins only, `null` lifts the restriction, and absent in a response means none. An admin not named sees the definition but not the values: the API leaves the field out of tasks, a write to it is `400`, and searching on it is an unknown query parameter (`400`).
     - `locked` stops editing in Quire only — API writes still go through. `editMembers` does apply to the API.
@@ -19,6 +18,7 @@ Covers the **Oct 15 2026** server release.
 - **Task search cursors** — documented on `QuireTaskSearchParams.cursor` and in the README; no code change.
     - A `sublist` search no longer puts a `cursor` on its last item, which was rejected with `400` when passed back. It is a single page, so pass a `limit` big enough, or `"no"`. Covered by TPG5 in `tests/live/task-pagination.live.test.ts`.
     - A cursor reaches at most 1,000,000 rows deep; a deeper one is `400`.
+- **README:** the `members` example assigned to `const private`, a reserved word in strict mode; renamed.
 - **Live tests** — two fixes from a full run against the Enterprise test org.
     - RL1 looked its rate limit up through the removed `/rate_limit` path (now `400 Invalid path`), read no limit, and so never took its skip on a high tier. It uses `/rate-limit` now. The client's comments no longer say the old path is still accepted.
     - TA7 no longer pins the approval comment's header wording. The API doc gives `**<stream>: <status>**`, but production stores a plain `Approved` for the default stream, so `approveTask`'s comments now promise only a header line and a blank line.
