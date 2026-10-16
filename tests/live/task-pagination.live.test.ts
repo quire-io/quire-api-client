@@ -12,6 +12,7 @@
  *   TPG1/TPG2 — /task/list under a parent task (small fixture).
  *   TPG3/TPG4 — /task/search filtered by a fresh tag.
  *   TPG5      — /task/search?sublist=, which is never paged (Oct 15 2026).
+ *   TPG6      — /task/list?status=, filtering before it pages.
  *
  * Negative cases (cursor + sublist on search → 400, cursor + depth>1 on
  * list → 400) are out-of-scope.
@@ -133,5 +134,33 @@ describe.skipIf(!hasTokens)("Live API — cursor pagination", () => {
     } finally {
       await client.deleteSublist(sublist.oid).catch(() => {});
     }
+  });
+
+  // Runs last: it completes child3.
+  it("TPG6 listSubtasks({status}) filters before paging", async () => {
+    const [child1, child2, child3] = childOids;
+    await client.updateTask(child3!, { status: 100 });
+    const oids = (list: QuireTask[]) => list.map((t) => t.oid).sort();
+
+    expect(oids(await client.listSubtasks(parent.oid, { status: "completed" })))
+      .toEqual([child3]);
+    expect(oids(await client.listSubtasks(parent.oid, { status: 100 })))
+      .toEqual([child3]);
+    expect(oids(await client.listSubtasks(parent.oid, { status: "active" })))
+      .toEqual([child1, child2].sort());
+
+    const page1 = (await client.listSubtasks(parent.oid, {
+      status: "active",
+      limit: 1,
+    })) as CursorTask[];
+    expect(page1.length).toBe(1);
+    const page2 = (await client.listSubtasks(parent.oid, {
+      status: "active",
+      limit: 1,
+      cursor: page1[0]!.cursor!,
+    })) as CursorTask[];
+    expect(page2.length).toBe(1);
+    expect(page2[0]!.cursor).toBeUndefined();
+    expect([page1[0]!.oid, page2[0]!.oid].sort()).toEqual([child1, child2].sort());
   });
 });

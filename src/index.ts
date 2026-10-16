@@ -13,6 +13,7 @@ export type {
   QuireMyTasksFilter,
   QuireMyTasksScope,
   QuireReminderListOptions,
+  QuireTaskListOptions,
   QuireTaskSearchParams,
 } from "./client.js";
 
@@ -64,6 +65,7 @@ export type {
   QuireFieldAccess,
   QuireFieldDefinition,
   QuireInsight,
+  QuireInsightOwnerType,
   QuireOrganization,
   QuirePartner,
   QuireProject,

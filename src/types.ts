@@ -336,6 +336,10 @@ export interface QuireTask {
   // `predecessors` is computed server-side and is read-only.
   successors?: string[];
   predecessors?: string[];
+  // {oid, id} companions to successors / predecessors (May 2 2026), the
+  // same shape as `?return=compact`.
+  successorRefs?: { oid: string; id: number }[];
+  predecessorRefs?: { oid: string; id: number }[];
   // Approval state (Apr 24 2026). Absent when no approval has been requested
   // or after a full revoke. Managed via POST /task/approve and DELETE
   // /task/revoke-approval — not via PUT /task/{oid}.
@@ -621,6 +625,12 @@ export interface QuireRateLimit {
 // ---------------------------------------------------------------------------
 // Insight view (custom project/org view) — Apr 22 2026
 // ---------------------------------------------------------------------------
+export type QuireInsightOwnerType =
+  | "project"
+  | "organization"
+  | "folder"
+  | "smart-folder";
+
 export interface QuireInsight {
   oid: string;
   id: string;
@@ -635,6 +645,7 @@ export interface QuireInsight {
   iconColor?: string;
   color?: string;
   owner?: { oid: string; id?: string; type?: string };
+  partner?: unknown;
   archivedAt?: string;
   // Insight-level custom-field definitions (Apr 22 2026). Same shape as
   // QuireProject.fields, but insights accept only the `formula` and

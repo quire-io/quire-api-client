@@ -9,12 +9,20 @@
  *   POST /comment/chat/{chatOid}   — chat-owned (QuireClient.addChatComment)
  *
  * C7a locks in the pinAt / pinBy contract for the `pinned` toggle on PUT
- * /comment/{oid}.
+ * /comment/{oid}; C1a the `pinned` and `asUser` flags on create.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { QuireComment } from "../../src/index.js";
 import { hasTokens, liveClient, rawApi, readEnv, runTag } from "./helpers.js";
+
+// A comment's `createdBy` comes back as a bare OID string, not the user
+// object the API doc and `QuireComment` declare (tags and partners do the
+// same). Read the OID from either shape.
+function createdByOid(c: QuireComment): string | undefined {
+  const by: unknown = c.createdBy;
+  return typeof by === "string" ? by : (by as { oid?: string } | undefined)?.oid;
+}
 
 describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
   const client = liveClient();
@@ -43,6 +51,21 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
     // can surface a deep-link directly.
     console.log("[C1] task comment url field:", c.url);
     commentOid = c.oid;
+  });
+
+  // `asUser: true` posts as the app, so `createdBy` is the app's OID (it
+  // starts with `ap|`), not the authorizing user's.
+  it("C1a addComment honours pinned and asUser", async () => {
+    const c = await client.addComment(taskOid!, `${runTag}-as-app`, {
+      pinned: true,
+      asUser: true,
+    });
+    try {
+      expect(c.pinAt).toBeTruthy();
+      expect(createdByOid(c)).toMatch(/^ap\|/);
+    } finally {
+      await client.deleteComment(c.oid).catch(() => {});
+    }
   });
 
   it("C2 getTaskComments contains the new comment", async () => {
@@ -148,6 +171,18 @@ describe.skipIf(!hasTokens)("Live API — /comment on a chat", () => {
     expect(c.owner?.oid).toBe(chatOid);
     console.log("[C5] chat comment url field:", c.url);
     commentOid = c.oid;
+  });
+
+  it("C5a addChatComment honours asUser", async () => {
+    const c = await client.addChatComment(chatOid!, {
+      description: `${runTag}-chat-as-app`,
+      asUser: true,
+    });
+    try {
+      expect(createdByOid(c)).toMatch(/^ap\|/);
+    } finally {
+      await client.deleteComment(c.oid).catch(() => {});
+    }
   });
 
   it("C6 listChatComments contains the new comment", async () => {

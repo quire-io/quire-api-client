@@ -1,11 +1,11 @@
 /**
- * Live API tests for /insight (I1-I6) and custom-field definitions on
+ * Live API tests for /insight (I1-I8) and custom-field definitions on
  * insights (IF1-IF5).
  *
- * Insights are per-owner (project or organization); QuireClient's
- * `createInsight` takes an `ownerType` parameter to switch URL roots.
- * We exercise the project-owned path here since the test project OID is
- * always present.
+ * Insights are per-owner (project, organization, folder or smart folder);
+ * QuireClient's `createInsight` takes an `ownerType` parameter to switch
+ * URL roots. I1-I6 exercise the project-owned path since the test project
+ * OID is always present; I7 the organization-owned one.
  *
  * Insight custom fields accept only `formula` and `lookup` types — project-
  * only types (`number`, `text`, `money`, `date`) return 400. IF1-IF5
@@ -17,7 +17,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { QuireFieldDefinition, QuireInsight } from "../../src/index.js";
-import { hasTokens, liveClient, readEnv, runTag } from "./helpers.js";
+import { hasTokens, liveClient, rawApi, readEnv, runTag } from "./helpers.js";
 
 describe.skipIf(!hasTokens)("Live API — /insight", () => {
   const client = liveClient();
@@ -43,6 +43,9 @@ describe.skipIf(!hasTokens)("Live API — /insight", () => {
   it("I2 listInsights contains the new insight", async () => {
     const list = await client.listInsights(PROJECT_OID);
     expect(list.some((i) => i.oid === insightOid)).toBe(true);
+    // The owner type spelled out reaches the same list.
+    const typed = await client.listInsights("project", PROJECT_OID);
+    expect(typed.map((i) => i.oid)).toEqual(list.map((i) => i.oid));
   });
 
   it("I3 getInsight returns matching oid", async () => {
@@ -87,6 +90,45 @@ describe.skipIf(!hasTokens)("Live API — /insight", () => {
     const again = await client.undoRemoveInsight(insightOid!);
     expect(again.oid).toBe(insightOid);
     // afterAll cleans up.
+  });
+
+  // An owner type left out of the URL means `project`; the server does not
+  // route an organization OID there by entity type, so an org's insights
+  // are reachable only with the owner type spelled out.
+  it("I7 an organization's insights need the owner type", async () => {
+    const ORG_OID = readEnv("QUIRE_TEST_ORG_OID");
+    const created = await client.createInsight("organization", ORG_OID, {
+      name: `${insightName}-org`,
+    });
+    try {
+      expect(created.owner?.oid).toBe(ORG_OID);
+      const list = await client.listInsights("organization", ORG_OID);
+      expect(list.some((i) => i.oid === created.oid)).toBe(true);
+
+      const bare = await rawApi("GET", `/insight/list/${ORG_OID}`);
+      expect(bare.status).toBe(404);
+    } finally {
+      await client.deleteInsight(created.oid).catch(() => {});
+    }
+  });
+
+  // Needs a partner on the test project (see partner.live.test.ts).
+  it("I8 createInsight shares it with a partner", async () => {
+    const [partner] = await client.listPartners(PROJECT_OID);
+    if (!partner) return;
+    const created = await client.createInsight("project", PROJECT_OID, {
+      name: `${insightName}-partner`,
+      partner: partner.oid,
+    });
+    try {
+      expect((created.partner as { oid?: string } | undefined)?.oid).toBe(
+        partner.oid,
+      );
+      // Shared with an external team, so always hidden from guests.
+      expect(created.private).toBeUndefined();
+    } finally {
+      await client.deleteInsight(created.oid).catch(() => {});
+    }
   });
 });
 

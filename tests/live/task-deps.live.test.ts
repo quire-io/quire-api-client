@@ -14,6 +14,8 @@
  *
  * Response shape: `successors` and `predecessors` are string arrays in
  * "#<numeric-id>" form. Both fields only appear when non-empty.
+ * `successorRefs` / `predecessorRefs` (May 2 2026) carry the same links as
+ * `{oid, id}` pairs.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -45,9 +47,17 @@ describe.skipIf(!hasTokens)("Live API — task dependencies", () => {
 
     const src = await client.getTask(source.oid);
     expect(src.successors).toContain(`#${successor.id}`);
+    expect(src.successorRefs).toContainEqual({
+      oid: successor.oid,
+      id: successor.id,
+    });
 
     const dst = await client.getTask(successor.oid);
     expect(dst.predecessors).toContain(`#${source.id}`);
+    expect(dst.predecessorRefs).toContainEqual({
+      oid: source.oid,
+      id: source.id,
+    });
   });
 
   it("T22 updateTask({removeSuccessors}) drops the link from both sides", async () => {

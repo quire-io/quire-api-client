@@ -215,10 +215,10 @@ Generated from 129 client methods covering 135 endpoints across 25 sections.
 
 | Method | HTTP | Endpoint |
 |---|---|---|
-| `listInsights` | `GET` | `/api/insight/list/{ownerOid}` |
+| `listInsights` | `GET` | `/api/insight/list/{projectOid}` |
+| `listInsights` | `GET` | `/api/insight/list/{ownerType}/{ownerOid}` |
 | `getInsight` | `GET` | `/api/insight/{insightOid}` |
-| `createInsight` | `POST` | `/api/insight/organization/{ownerOid}` |
-| `createInsight` | `POST` | `/api/insight/{ownerOid}` |
+| `createInsight` | `POST` | `/api/insight/{ownerType}/{ownerOid}` |
 | `updateInsight` | `PUT` | `/api/insight/{insightOid}` |
 | `deleteInsight` | `DELETE` | `/api/insight/{insightOid}` |
 | `undoRemoveInsight` | `PUT` | `/api/insight/undo-remove/{insightOid}` |

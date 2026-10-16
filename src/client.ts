@@ -40,6 +40,7 @@ import type {
   QuireChat,
   QuireDashboard,
   QuireDashboardOwnerType,
+  QuireInsightOwnerType,
   QuireDocument,
   QuireTokens,
   QuireUser,
@@ -247,12 +248,24 @@ function flattenCustomFields<T extends { customFields?: Record<string, unknown> 
 // stream is signalled by the absence of `cursor` on the final item. The
 // previous unbounded /task/list 200-cap fail-loud workaround (issue #83)
 // is retired — callers paginate explicitly via `limit` / `cursor`.
+// `?status=` composes with both and filters before paging.
 
-function listPagingQuery(options: {
+export interface QuireTaskListOptions {
+  /**
+   * `"active"` or `"completed"`, or one status value (0..100). Omit for
+   * every task. Applied before paging, so a page still holds `limit` tasks
+   * while that many match.
+   */
+  status?: "active" | "completed" | number;
+  /** Page size, 1..1000, or `"no"` for every task in one array. */
   limit?: number | "no";
+  /** The previous page's last-item `cursor`, passed back verbatim. */
   cursor?: string;
-}): string {
+}
+
+function listPagingQuery(options: QuireTaskListOptions): string {
   const parts: string[] = [];
+  if (options.status !== undefined) parts.push(`status=${options.status}`);
   if (options.limit !== undefined) parts.push(`limit=${options.limit}`);
   if (options.cursor !== undefined)
     parts.push(`cursor=${encodeURIComponent(options.cursor)}`);
@@ -716,10 +729,11 @@ export class QuireClient {
   // /task/list with opt-in cursor pagination (Apr 27 2026). Pass `limit`
   // (positive int or "no" for unlimited) plus optional `cursor` from the
   // previous page's last item to walk multi-page result sets. Without
-  // either param, the response is the full bare array as before.
+  // either param, the response is the full bare array as before. `status`
+  // narrows it to active, completed, or one status value.
   async listTasks(
     projectOid: string,
-    options: { limit?: number | "no"; cursor?: string } = {},
+    options: QuireTaskListOptions = {},
   ): Promise<QuireTask[]> {
     return this.fetch<QuireTask[]>(
       `/task/list/${projectOid}${listPagingQuery(options)}`,
@@ -728,7 +742,7 @@ export class QuireClient {
 
   async listSubtasks(
     taskOid: string,
-    options: { limit?: number | "no"; cursor?: string } = {},
+    options: QuireTaskListOptions = {},
   ): Promise<QuireTask[]> {
     return this.fetch<QuireTask[]>(
       `/task/list/${taskOid}${listPagingQuery(options)}`,
@@ -1675,21 +1689,32 @@ export class QuireClient {
     return this.fetch<QuireComment>(`/comment/${commentOid}`);
   }
 
+  // `pinned` pins the comment as it is created. `asUser: true` posts it as
+  // the app instead of the authorizing user — `createdBy` is then the app.
   async addComment<const Compact extends boolean = false>(
     taskOid: string,
     text: string,
-    options?: { compact?: Compact },
+    options?: { compact?: Compact; pinned?: boolean; asUser?: boolean },
   ): Promise<Compact extends true ? QuireCompactRef : QuireComment> {
     const qs = options?.compact ? "?return=compact" : "";
     return this.fetch(`/comment/${taskOid}${qs}`, {
       method: "POST",
-      body: JSON.stringify({ description: text }),
+      body: JSON.stringify({
+        description: text,
+        pinned: options?.pinned,
+        asUser: options?.asUser,
+      }),
     }) as Promise<Compact extends true ? QuireCompactRef : QuireComment>;
   }
 
   async addChatComment<const Compact extends boolean = false>(
     chatOid: string,
-    body: { description: string; pinned?: boolean; compact?: Compact },
+    body: {
+      description: string;
+      pinned?: boolean;
+      asUser?: boolean;
+      compact?: Compact;
+    },
   ): Promise<Compact extends true ? QuireCompactRef : QuireComment> {
     const { compact, ...wire } = body;
     const qs = compact ? "?return=compact" : "";
@@ -2004,15 +2029,29 @@ export class QuireClient {
   // -----------------------------------------------------------------------
   // Insight views — Apr 22 2026
   //
-  // Mirrors the Sublist / Doc / Chat shape. GET /insight/list/{ownerOid}
-  // works for both project and organization OIDs — Quire routes by entity
-  // type. POST uses `/insight/{projectOid}` for project-owned views and
-  // `/insight/organization/{orgOid}` for org-owned — confirmed by
-  // ../boeneo/web/test/api/insight_test.dart.
+  // Mirrors the Sublist / Doc / Chat shape: owned by a project,
+  // organization, folder or smart folder. When the owner type is left out
+  // of the URL it is `project` — the server does NOT route an organization
+  // OID there by entity type (`/insight/list/{orgOid}` is 404).
   // -----------------------------------------------------------------------
 
-  async listInsights(ownerOid: string): Promise<QuireInsight[]> {
-    return this.fetch<QuireInsight[]>(`/insight/list/${ownerOid}`);
+  // One argument is a project OID, as before; pass the owner type first to
+  // list another owner's.
+  listInsights(projectOid: string): Promise<QuireInsight[]>;
+  listInsights(
+    ownerType: QuireInsightOwnerType,
+    ownerOid: string,
+  ): Promise<QuireInsight[]>;
+  async listInsights(
+    ownerTypeOrOid: string,
+    ownerOid?: string,
+  ): Promise<QuireInsight[]> {
+    if (ownerOid === undefined) {
+      const projectOid = ownerTypeOrOid;
+      return this.fetch<QuireInsight[]>(`/insight/list/${projectOid}`);
+    }
+    const ownerType = ownerTypeOrOid;
+    return this.fetch<QuireInsight[]>(`/insight/list/${ownerType}/${ownerOid}`);
   }
 
   async getInsight(insightOid: string): Promise<QuireInsight> {
@@ -2020,7 +2059,7 @@ export class QuireClient {
   }
 
   async createInsight(
-    ownerType: "project" | "organization",
+    ownerType: QuireInsightOwnerType,
     ownerOid: string,
     body: {
       name: string;
@@ -2028,6 +2067,8 @@ export class QuireClient {
       image?: string;
       iconColor?: string;
       id?: string;
+      // OID of an external team to share this insight with.
+      partner?: string;
       // Who can see this record (Sep 21 2026). Omit or pass null for every
       // member of the owner; `[]` for the owner's admins only; a list of
       // users (OID, ID, email, or `"me"`) for just those. Every listed user
@@ -2043,10 +2084,7 @@ export class QuireClient {
       private?: boolean;
     },
   ): Promise<QuireInsight> {
-    const path = ownerType === "organization"
-      ? `/insight/organization/${ownerOid}`
-      : `/insight/${ownerOid}`;
-    return this.fetch<QuireInsight>(path, {
+    return this.fetch<QuireInsight>(`/insight/${ownerType}/${ownerOid}`, {
       method: "POST",
       body: JSON.stringify(body),
     });
