@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2 — 2026-10-16
+
+- **Fix: `createdBy` of a comment, tag or partner is a user object again** — `QuireComment.createdBy`, `QuireTag.createdBy` and `QuirePartner.createdBy` are typed `{ oid, id, name }`, as in 1.1.0 and as the API doc gives. The Oct 16 2026 server release renders them so (zkoss/boeneo#26017); until then they were the creator's bare OID, which 1.2.0 typed as `string`. Code written against 1.2.0's `string` now fails to compile; read `createdBy.oid` for the OID.
+    - A comment posted with `asUser: true` gives the app: `id` is `ap|<app ID>`, `name` the app's name and `oid` its agent OID (`ap|…`).
+    - The same server release returns an app acting for a user (`asUser`) in a task's `createdBy`, `editedBy`, `followers` and the like as the app (`id` `ap|<app ID>` and the app's name) instead of a placeholder. The types are unchanged.
+    - Covered by C1, C1a, C5a, TAG1 and PT1.
+
 ## 1.2.1 — 2026-10-16
 
 - **Fix: no `start` / `due` on a dashboard, doc or chat** — `createDashboard` / `updateDashboard` no longer take `start` / `due`, and `QuireDashboard`, `QuireDocument` and `QuireChat` no longer declare them. Only a sublist has these dates: on a dashboard, doc, chat or insight the server rejects them with `400` (`Not allowed to access field(s)`) and never returns them. The API doc lists them for all five because they share one model. A call that passed either was always rejected, and now fails to compile.
