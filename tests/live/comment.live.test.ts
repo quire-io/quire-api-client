@@ -39,16 +39,18 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
   it("C1 addComment creates a task comment", async () => {
     const c = await client.addComment(taskOid!, COMMENT_TEXT);
     expect(c.oid).toBeTruthy();
-    // A bare user OID, unlike `editedBy` / `pinBy` (zkoss/boeneo#26017).
-    expect(typeof c.createdBy).toBe("string");
+    // A user object, as `editedBy` / `pinBy` are — the bare OID it was
+    // until zkoss/boeneo#26017.
+    expect(c.createdBy?.oid).toBeTruthy();
+    expect(c.createdBy?.name).toBeTruthy();
     // Probe: does the create response include `url`? If so, add_comment
     // can surface a deep-link directly.
     console.log("[C1] task comment url field:", c.url);
     commentOid = c.oid;
   });
 
-  // `asUser: true` posts as the app, so `createdBy` is the app's OID (it
-  // starts with `ap|`), not the authorizing user's.
+  // `asUser: true` posts as the app, so `createdBy` is the app (its `id`
+  // starts with `ap|`), not the authorizing user.
   it("C1a addComment honours pinned and asUser", async () => {
     const c = await client.addComment(taskOid!, `${runTag}-as-app`, {
       pinned: true,
@@ -56,7 +58,7 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
     });
     try {
       expect(c.pinAt).toBeTruthy();
-      expect(c.createdBy).toMatch(/^ap\|/);
+      expect(c.createdBy?.id).toMatch(/^ap\|/);
     } finally {
       await client.deleteComment(c.oid).catch(() => {});
     }
@@ -173,7 +175,7 @@ describe.skipIf(!hasTokens)("Live API — /comment on a chat", () => {
       asUser: true,
     });
     try {
-      expect(c.createdBy).toMatch(/^ap\|/);
+      expect(c.createdBy?.id).toMatch(/^ap\|/);
     } finally {
       await client.deleteComment(c.oid).catch(() => {});
     }

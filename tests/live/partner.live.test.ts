@@ -28,9 +28,10 @@ describe.skipIf(!hasTokens)("Live API — /partner", () => {
       expect(p.oid).toBeTruthy();
       expect(p.name).toBeTruthy();
       expect(p.project?.oid).toBe(PROJECT_OID);
-      // Both strings: the palette code, and the creator's bare user OID.
+      // The palette code is a string; the creator, a user object — the
+      // bare OID it was until zkoss/boeneo#26017.
       if (p.color !== undefined) expect(typeof p.color).toBe("string");
-      if (p.createdBy !== undefined) expect(typeof p.createdBy).toBe("string");
+      if (p.createdBy !== undefined) expect(p.createdBy.oid).toBeTruthy();
     }
   });
 

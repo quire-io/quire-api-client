@@ -1690,8 +1690,8 @@ export class QuireClient {
   }
 
   // `pinned` pins the comment as it is created. `asUser: true` posts it as
-  // the app instead of the authorizing user — `createdBy` is then the app's
-  // agent OID (`ap|…`).
+  // the app instead of the authorizing user — `createdBy` is then the app,
+  // whose `id` is `ap|<app ID>`.
   async addComment<const Compact extends boolean = false>(
     taskOid: string,
     text: string,

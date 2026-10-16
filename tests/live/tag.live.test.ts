@@ -30,12 +30,12 @@ describe.skipIf(!hasTokens)("Live API — /tag", () => {
 
   it("TAG1 createTag without color auto-assigns a palette color", async () => {
     const t = await client.createTag(PROJECT_OID, { name: TAG_NAME });
+    tagOid = t.oid; // before the asserts, so afterAll removes it if one fails
     expect(t.oid).toBeTruthy();
     expect(t.nameText ?? t.name).toBe(TAG_NAME);
     expect(t.color).toMatch(/^[0-5][0-7]$/);
-    // A bare user OID, not a user object (zkoss/boeneo#26017).
-    expect(typeof t.createdBy).toBe("string");
-    tagOid = t.oid;
+    // A user object — the bare OID it was until zkoss/boeneo#26017.
+    expect(t.createdBy?.oid).toBeTruthy();
   });
 
   it("TAG1b createTag accepts every NAMED_COLORS palette code", async () => {
