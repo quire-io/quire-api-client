@@ -339,9 +339,20 @@ Listing is by owner, and a project's list includes the reminders on its tasks �
 await client.listReminders("project", projectOid);        // project + its tasks'
 await client.listReminders("task", taskOid);              // just this task's
 await client.listReminders("project", projectOid, { limit: 100 });
+
+// Still to fire at a time of their own — e.g. to sync to a calendar
+await client.listReminders("project", projectOid, {
+  timing: "standalone",
+  status: "active",
+});
 ```
 
 Reminders are ordered by `oid` — stable, but **not** chronological, so sort client-side on the field you care about. With a numeric `limit`, the last item of a page carries a `cursor` when more remain.
+
+Two filters narrow a list server-side; omitted, it is unchanged:
+
+- `timing` — `"standalone"` for the reminders firing at their own `when` (no task, or a task with neither a start nor a due date), `"anchored"` for those firing from their task's date (their `when` is null).
+- `status` — `"active"` for only those with a notification still to come (not all past, not on a completed or archived task); `"all"` is the default. A page still holds `limit` reminders while that many remain.
 
 `deleteReminder` is **permanent**: a reminder is not moved to the trash and cannot be restored, so there is no undo-remove for it.
 

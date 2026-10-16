@@ -1,6 +1,6 @@
 /**
- * Live API tests for /reminder (RM1-RM8), added in the Sep 21 2026 server
- * release.
+ * Live API tests for /reminder (RM1-RM10), added in the Sep 21 2026 server
+ * release; the list's `timing` / `status` filters (RM9-RM10) came Sep 25.
  *
  * Two things make reminders different from the other work endpoints, and
  * both are pinned here:
@@ -32,6 +32,8 @@ describe.skipIf(!hasTokens)("Live API — /reminder", () => {
   let reminder: QuireReminder | undefined;
   let datedTask: QuireTask | undefined;
   let undatedTask: QuireTask | undefined;
+  let standaloneReminder: QuireReminder | undefined;
+  let anchoredReminder: QuireReminder | undefined;
   const strays: string[] = [];
 
   beforeAll(async () => {
@@ -96,6 +98,7 @@ describe.skipIf(!hasTokens)("Live API — /reminder", () => {
       when: WHEN,
     });
     strays.push(created.oid);
+    standaloneReminder = created;
     expect(created.task?.oid).toBe(undatedTask.oid);
     expect(created.when).toBe(WHEN);
   });
@@ -119,6 +122,7 @@ describe.skipIf(!hasTokens)("Live API — /reminder", () => {
       leads: [{ days: 1, at: "09:00" }],
     });
     strays.push(created.oid);
+    anchoredReminder = created;
     expect(created.when ?? null).toBeNull();
     expect(created.leads).toEqual([{ days: 1, at: "09:00" }]);
   });
@@ -140,5 +144,42 @@ describe.skipIf(!hasTokens)("Live API — /reminder", () => {
     const got = await rawApi("GET", `/reminder/${oid}`);
     expect(got.status).toBe(404);
     reminder = undefined; // prevent afterAll re-delete
+  });
+
+  // RM5's reminder fires at its own `when` (its task is undated); RM6's
+  // fires from its task's due date. `timing` splits the project's list
+  // along exactly that line.
+  it("RM9 listReminders filters by timing", async () => {
+    const standalone = await client.listReminders("project", PROJECT_OID, {
+      timing: "standalone",
+    });
+    const ids = (list: QuireReminder[]) => list.map((r) => r.oid);
+    expect(ids(standalone)).toContain(standaloneReminder!.oid);
+    expect(ids(standalone)).not.toContain(anchoredReminder!.oid);
+    expect(standalone.every((r) => r.when)).toBe(true);
+
+    const anchored = await client.listReminders("project", PROJECT_OID, {
+      timing: "anchored",
+    });
+    expect(ids(anchored)).toContain(anchoredReminder!.oid);
+    expect(ids(anchored)).not.toContain(standaloneReminder!.oid);
+    expect(anchored.every((r) => (r.when ?? null) === null)).toBe(true);
+  });
+
+  // A reminder on a completed task has no notification still to come, so
+  // `active` drops it while `all` (the default) keeps it.
+  it("RM10 listReminders with status active leaves out a completed task's", async () => {
+    const ids = async (status?: "active" | "all") =>
+      (await client.listReminders("project", PROJECT_OID, { status })).map(
+        (r) => r.oid,
+      );
+    expect(await ids("active")).toContain(standaloneReminder!.oid);
+
+    await client.updateTask(undatedTask!.oid, { status: 100 });
+    const active = await ids("active");
+    expect(active).not.toContain(standaloneReminder!.oid);
+    expect(active).toContain(anchoredReminder!.oid);
+    expect(await ids("all")).toContain(standaloneReminder!.oid);
+    expect(await ids()).toContain(standaloneReminder!.oid);
   });
 });

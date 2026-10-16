@@ -2371,7 +2371,8 @@ export class QuireClient {
   // if it is restored, and stay reachable by OID meanwhile).
   //
   // Ordered by `oid`: stable, but NOT chronological — sort client-side on
-  // the field you care about.
+  // the field you care about. `timing` / `status` filter server-side; see
+  // `QuireReminderListOptions`.
   async listReminders(
     ownerType: QuireReminderOwnerType,
     ownerOid: string,
@@ -2490,6 +2491,25 @@ export interface QuireReminderListOptions {
   limit?: number | "no";
   /** The previous page's last-item `cursor`, passed back verbatim. */
   cursor?: string;
+  /**
+   * List only the reminders that fire (Sep 25 2026):
+   *
+   * - `"standalone"` — at their own `when`: no task, or a task with neither
+   *   a start nor a due date.
+   * - `"anchored"` — from their task's due date (or its start date when it
+   *   has no due date). Their `when` is null.
+   *
+   * Omit for both. `{ timing: "standalone", status: "active" }` is the set
+   * still to fire at a time of their own, e.g. to sync to a calendar.
+   */
+  timing?: "standalone" | "anchored";
+  /**
+   * `"active"` lists only the reminders with a notification still to come —
+   * not one whose notifications are all past, nor one on a completed or
+   * archived task. `"all"` (the default) lists every one. A page still holds
+   * `limit` reminders while that many remain (Sep 25 2026).
+   */
+  status?: "active" | "all";
 }
 
 function reminderListQuery(options: QuireReminderListOptions): string {
@@ -2497,5 +2517,7 @@ function reminderListQuery(options: QuireReminderListOptions): string {
   if (options.limit !== undefined) parts.push(`limit=${options.limit}`);
   if (options.cursor !== undefined)
     parts.push(`cursor=${encodeURIComponent(options.cursor)}`);
+  if (options.timing !== undefined) parts.push(`timing=${options.timing}`);
+  if (options.status !== undefined) parts.push(`status=${options.status}`);
   return parts.length ? `?${parts.join("&")}` : "";
 }

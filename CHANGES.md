@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Reminder list filters** — covers the **Sep 25 2026** server release, which 1.1.0 skipped. `QuireReminderListOptions` gains `timing` and `status`, so `listReminders`, `listRemindersById` and `listTaskRemindersById` can send `?timing=` and `?status=`. Omitted, the list is unchanged.
+    - `timing: "standalone"` lists the reminders firing at their own `when` (no task, or a task with neither a start nor a due date); `"anchored"` those firing from their task's date, whose `when` is null.
+    - `status: "active"` lists only the reminders with a notification still to come — not one whose notifications are all past, nor one on a completed or archived task. `"all"` is the default. A page still holds `limit` reminders while that many remain.
+    - The same release's reminder webhooks (activity types `84` / `87` / `88` and `192` / `193` / `194`) are server-side only and need nothing here. Covered by RM9-RM10 in `tests/live/reminder.live.test.ts`.
 - **Package metadata:** `homepage` points to the Quire API reference instead of the GitHub repo, which stays linked as `repository`. The link carries `utm_source=npm&utm_medium=referral&utm_campaign=api-client` so GA4 can attribute the visits; on quire.io/dev/api/ the tag stays out of Quire's signup-source stats. The README's status line no longer calls the package pre-1.0.
 
 ## 1.1.0 — 2026-10-16
