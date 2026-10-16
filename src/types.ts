@@ -478,8 +478,6 @@ export interface QuireChat {
   iconColor?: string;
   owner?: unknown;
   partner?: unknown;
-  start?: string;
-  due?: string;
   archivedAt?: string;
   // Follower management shipped Jun 4 2026 — both lists are user refs.
   // `mutes` is the subset of followers who muted the channel.
@@ -523,8 +521,6 @@ export interface QuireDocument {
   iconColor?: string;
   owner?: unknown;
   partner?: unknown;
-  start?: string;
-  due?: string;
   archivedAt?: string;
   // Follower management shipped Jun 4 2026 — only project-owned documents
   // are followable; the fields are absent for other owner types.
@@ -576,8 +572,6 @@ export interface QuireDashboard {
   iconColor?: string;
   owner?: unknown;
   partner?: unknown;
-  start?: string;
-  due?: string;
   archivedAt?: string;
   createdBy?: { oid: string; id: string; name: string };
   createdAt?: string;

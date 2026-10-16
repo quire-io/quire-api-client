@@ -2209,9 +2209,9 @@ export class QuireClient {
   //
   // Widget collections owned by a project, organization, folder, or
   // smart-folder. The API manages the dashboard container only (name,
-  // description, icon, dates, archive state) — widget definitions are not
-  // part of the public API yet. Create / undo-remove count against a
-  // per-owner quota and return 429 when the plan limit is reached.
+  // description, icon, archive state) — widget definitions are not part of
+  // the public API yet. Create / undo-remove count against a per-owner
+  // quota and return 402 when the plan limit is reached.
   // -----------------------------------------------------------------------
 
   async listDashboards(
@@ -2248,8 +2248,6 @@ export class QuireClient {
       iconColor?: string;
       image?: string;
       partner?: string;
-      start?: string;
-      due?: string;
       // Who can see this record (Sep 21 2026). Omit or pass null for every
       // member of the owner; `[]` for the owner's admins only; a list of
       // users (OID, ID, email, or `"me"`) for just those. Every listed user
@@ -2271,8 +2269,8 @@ export class QuireClient {
     });
   }
 
-  // Set `archived: true` / `false` to archive or unarchive. Pass null on
-  // `start` / `due` to clear the existing date.
+  // Set `archived: true` / `false` to archive or unarchive. A dashboard has
+  // no `start` / `due` — only a sublist does — and sending either is 400.
   async updateDashboard(
     dashboardOid: string,
     body: {
@@ -2281,8 +2279,6 @@ export class QuireClient {
       description?: string;
       iconColor?: string;
       image?: string;
-      start?: string | null;
-      due?: string | null;
       archived?: boolean;
       // Hide this record from guests and from the visitors of a public
       // project or of a share link (Oct 15 2026). A choice only while
@@ -2301,7 +2297,7 @@ export class QuireClient {
     await this.fetch<void>(`/dashboard/${dashboardOid}`, { method: "DELETE" });
   }
 
-  // Idempotent; subject to the same per-owner quota as create (429 when
+  // Idempotent; subject to the same per-owner quota as create (402 when
   // the plan limit is reached).
   async undoRemoveDashboard(dashboardOid: string): Promise<QuireDashboard> {
     return this.fetch<QuireDashboard>(

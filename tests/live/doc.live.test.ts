@@ -1,5 +1,5 @@
 /**
- * Live API tests for /doc (D1-D7).
+ * Live API tests for /doc (D1-D8).
  *
  * Documents are owned by a project (the only owner type the API supports).
  * QuireClient's `listDocuments` / `createDocument` / `updateDocument` /
@@ -79,5 +79,15 @@ describe.skipIf(!hasTokens)("Live API — /doc", () => {
     expect(fresh.oid).toBe(created.oid);
 
     await client.deleteDocument(created.oid).catch(() => {});
+  });
+
+  // Only a sublist has a start / due date; the API doc lists them for a doc
+  // too because the two share a model.
+  it("D8 createDocument rejects start with 400", async () => {
+    const res = await rawApi("POST", `/doc/project/${PROJECT_OID}`, {
+      name: `${runTag}-doc-dated`,
+      start: "2027-01-02",
+    });
+    expect(res.status).toBe(400);
   });
 });

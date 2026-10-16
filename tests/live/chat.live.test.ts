@@ -1,5 +1,5 @@
 /**
- * Live API tests for /chat (CH1-CH5).
+ * Live API tests for /chat (CH1-CH6).
  *
  * Self-contained: each describe creates its own throwaway chat in
  * beforeAll so the suite doesn't depend on a hand-seeded chat in the
@@ -75,5 +75,15 @@ describe.skipIf(!hasTokens)("Live API — /chat", () => {
     expect(fresh.oid).toBe(created.oid);
 
     await client.deleteChat(created.oid).catch(() => {});
+  });
+
+  // Only a sublist has a start / due date; the API doc lists them for a
+  // chat too because the two share a model.
+  it("CH6 createChat rejects start with 400", async () => {
+    const res = await rawApi("POST", `/chat/project/${PROJECT_OID}`, {
+      name: `${runTag}-chat-dated`,
+      start: "2027-01-02",
+    });
+    expect(res.status).toBe(400);
   });
 });
