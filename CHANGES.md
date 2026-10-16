@@ -19,6 +19,9 @@ Covers the **Oct 15 2026** server release.
 - **Task search cursors** — documented on `QuireTaskSearchParams.cursor` and in the README; no code change.
     - A `sublist` search no longer puts a `cursor` on its last item, which was rejected with `400` when passed back. It is a single page, so pass a `limit` big enough, or `"no"`. Covered by TPG5 in `tests/live/task-pagination.live.test.ts`.
     - A cursor reaches at most 1,000,000 rows deep; a deeper one is `400`.
+- **Live tests** — two fixes from a full run against the Enterprise test org.
+    - RL1 looked its rate limit up through the removed `/rate_limit` path (now `400 Invalid path`), read no limit, and so never took its skip on a high tier. It uses `/rate-limit` now. The client's comments no longer say the old path is still accepted.
+    - TA7 no longer pins the approval comment's header wording. The API doc gives `**<stream>: <status>**`, but production stores a plain `Approved` for the default stream, so `approveTask`'s comments now promise only a header line and a blank line.
 
 ## 1.0.0 — 2026-09-22
 

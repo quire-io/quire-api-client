@@ -597,7 +597,7 @@ export interface QuireDashboard {
 // ---------------------------------------------------------------------------
 // Rate limit — Apr 22 2026
 //
-// GET /rate_limit/{orgOid} returns per-hour and per-minute API-usage
+// GET /rate-limit/{orgOid} returns per-hour and per-minute API-usage
 // buckets for an organization. `limit: -1` on either bucket means
 // unlimited. `reset` is a Unix timestamp in seconds. The endpoint itself
 // is free (doesn't count against the quota) — see

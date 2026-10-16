@@ -98,12 +98,14 @@ describe.skipIf(!hasTokens)("Live API — error responses", () => {
     const MAX_BATCHES = 4;
     const TOTAL = BATCH_SIZE * MAX_BATCHES;
 
-    // /rate_limit/{orgOid} is free (doesn't count against quota). Used to
+    // /rate-limit/{orgOid} is free (doesn't count against quota). Used to
     // gate the burst — if minute.limit exceeds what TOTAL can hit, skip.
+    // Not the old /rate_limit form: that is `400 Invalid path` now, which
+    // read as no limit and never skipped.
     const orgOid = readEnv("QUIRE_TEST_ORG_OID");
     const rl = await rawApi<QuireRateLimit>(
       "GET",
-      `/rate_limit/${orgOid}`,
+      `/rate-limit/${orgOid}`,
     );
     const minuteLimit = rl.data?.minute?.limit ?? 0;
     if (minuteLimit > TOTAL) {

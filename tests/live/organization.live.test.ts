@@ -116,8 +116,7 @@ describe.skipIf(!hasTokens)("Live API — /organization", () => {
 
   // /rate-limit/{oid} is free (skipAppAccessLimit on the server) — running
   // this doesn't bump the shared org's counter. Path was renamed from
-  // /rate_limit (deprecated, still accepted) on May 22 2026; the client
-  // now hits the hyphenated form.
+  // /rate_limit on May 22 2026; the old form is `400 Invalid path` now.
   it("O6 getRateLimit returns hour + minute usage buckets", async () => {
     const data = await client.getRateLimit(ORG_OID);
     expect(data.organization).toBe(ORG_OID);

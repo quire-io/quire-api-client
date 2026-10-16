@@ -466,8 +466,8 @@ export class QuireClient {
   // against either bucket (server invokes skipAppAccessLimit).
   //
   // May 22 2026: server renamed the path from `/rate_limit` to
-  // `/rate-limit`. The old underscore form is still accepted (deprecated)
-  // but new clients hit the hyphenated path.
+  // `/rate-limit`. The old underscore form was accepted for a while; it is
+  // `400 Invalid path` now.
   async getRateLimit(orgOid: string): Promise<QuireRateLimit> {
     return this.fetch<QuireRateLimit>(`/rate-limit/${orgOid}`);
   }
@@ -1483,9 +1483,11 @@ export class QuireClient {
   // so the grammar matches the bulk-approve endpoint. May 27 2026 reused
   // the request body for an optional companion comment: when `comment` is
   // supplied, the server posts a comment on the task as a side effect of
-  // the approval, prefixed with `**<stream>: <status>**\n\n`. The
-  // approval response shape is unchanged — fetch the created comment via
-  // `/comment/list/{taskOid}` if needed.
+  // the approval, prefixed with a header line naming the decision and a
+  // blank line. Don't parse the header: the API doc gives
+  // `**<stream>: <status>**`, but production stores a plain `Approved` for
+  // the default stream (TA7). The approval response shape is unchanged —
+  // fetch the created comment via `/comment/list/{taskOid}` if needed.
   // Response is the Approval object only (not the full task). DELETE
   // /task/revoke-approval returns 204 with no body in all three cases:
   // rolling back approved/rejected → awaiting, clearing awaiting/changes
@@ -1506,9 +1508,10 @@ export class QuireClient {
       /**
        * Optional companion comment posted on the task as a side effect of
        * the approval (May 27 2026). `description` is required when supplied;
-       * the server auto-prefixes the stored comment with
-       * `**<stream>: <status>**\n\n`. The created comment is not part of
-       * the approval response — fetch it via `getTaskComments` afterward.
+       * the server prefixes the stored comment with a header line naming
+       * the decision and a blank line — its wording isn't stable, so don't
+       * parse it. The created comment is not part of the approval
+       * response — fetch it via `getTaskComments` afterward.
        */
       comment?: {
         description: string;

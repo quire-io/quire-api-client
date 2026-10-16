@@ -136,9 +136,9 @@ describe.skipIf(!hasTokens)("Live API — /task/approve + /revoke-approval", () 
 
   // May 27 2026: /task/approve accepts an optional companion comment that
   // is posted on the task as a side effect of the approval. The stored
-  // comment is auto-prefixed with `**<stream>: <status>**\n\n`. The
-  // approval response shape is unchanged — fetch the comment via
-  // getTaskComments to verify it landed.
+  // comment is prefixed with a header line and a blank line. The approval
+  // response shape is unchanged — fetch the comment via getTaskComments to
+  // verify it landed.
   it("TA7 approveTask({state:'approve',comment:{description}}) posts a prefixed comment", async () => {
     const description = `TA7 review note ${runTag}`;
 
@@ -155,11 +155,13 @@ describe.skipIf(!hasTokens)("Live API — /task/approve + /revoke-approval", () 
       typeof c.description === "string" && c.description.includes(description),
     );
     expect(match).toBeDefined();
-    // Server-applied prefix: `**<stream>: <status>**\n\n`. State `approve`
-    // maps to "Approve" in the stored prefix; default category renders the
-    // stream as "Approval".
-    expect(match!.description!.startsWith("**")).toBe(true);
-    expect(match!.description).toContain("**\n\n");
+    // Server-applied header, a blank line, then the body. Only the shape is
+    // pinned: the API doc gives the header as `**<stream>: <status>**`, but
+    // production stores a plain `Approved` for the default stream.
+    const [header, ...rest] = match!.description!.split("\n\n");
+    expect(header!.length).toBeGreaterThan(0);
+    expect(header).not.toContain(description);
+    expect(rest.join("\n\n")).toBe(description);
 
     await client.revokeTaskApproval(taskOid);
   });
