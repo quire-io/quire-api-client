@@ -4,7 +4,7 @@ A TypeScript client for the [Quire](https://quire.io) [REST API](https://quire.i
 
 Typed wrappers around `fetch`, OAuth helpers, and error-formatting utilities for the Quire API. Used by the [Quire CLI](https://github.com/quire-io/quire-cli) and other Node-based Quire integrations.
 
-> **Status:** v0.1.x is the initial extraction. Expect minor breaking changes before 1.0.
+> **Status:** stable since 1.0.0 — the public API follows semver, so a breaking change needs a major version.
 
 ## Install
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Package metadata:** `homepage` points to the Quire API reference (`https://quire.io/dev/api/`) instead of the GitHub repo, which stays linked as `repository`. The README's status line no longer calls the package pre-1.0.
+
 ## 1.1.0 — 2026-10-16
 
 Covers the **Oct 15 2026** server release. Everything is additive: new methods, new optional fields and wider body types, so existing callers compile and behave as before. The release's reminder rules for public-project visitors and guests are server-side only and need nothing here.
