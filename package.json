@@ -4,7 +4,7 @@
   "description": "TypeScript client for the Quire API — typed endpoints, OAuth helpers, error formatting.",
   "license": "MIT",
   "author": "Potix Corporation",
-  "homepage": "https://quire.io/dev/api/",
+  "homepage": "https://quire.io/dev/api/?utm_source=npm&utm_medium=referral&utm_campaign=api-client",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/quire-io/quire-api-client.git"

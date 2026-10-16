@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Package metadata:** `homepage` points to the Quire API reference (`https://quire.io/dev/api/`) instead of the GitHub repo, which stays linked as `repository`. The README's status line no longer calls the package pre-1.0.
+- **Package metadata:** `homepage` points to the Quire API reference instead of the GitHub repo, which stays linked as `repository`. The link carries `utm_source=npm&utm_medium=referral&utm_campaign=api-client` so GA4 can attribute the visits; on quire.io/dev/api/ the tag stays out of Quire's signup-source stats. The README's status line no longer calls the package pre-1.0.
 
 ## 1.1.0 — 2026-10-16
 
