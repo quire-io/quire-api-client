@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 — 2026-10-16
+
+- **Fix: no `start` / `due` on a dashboard, doc or chat** — `createDashboard` / `updateDashboard` no longer take `start` / `due`, and `QuireDashboard`, `QuireDocument` and `QuireChat` no longer declare them. Only a sublist has these dates: on a dashboard, doc, chat or insight the server rejects them with `400` (`Not allowed to access field(s)`) and never returns them. The API doc lists them for all five because they share one model. A call that passed either was always rejected, and now fails to compile.
+    - The dashboard methods' comments give `402` for the plan limit, not `429`, following the Sep 21 2026 status split.
+    - Covered by the new `tests/live/dashboard.live.test.ts` (DB1-DB7; DB5 for the dates), and by D8 and CH6.
+
 ## 1.2.0 — 2026-10-16
 
 Fills the gaps found by checking the client against the API reference: the **Sep 25 2026** server release, which 1.1.0 skipped, and parameters and fields the client never exposed. The new parameters are optional and the methods keep their signatures. The exception is the `createdBy` and `color` type fixes below: code that read a property of a user object that was never there now gets a compile error instead of `undefined`.
