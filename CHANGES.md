@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — 2026-10-16
+
+Fills the gaps found by checking the client against the API reference: the **Sep 25 2026** server release, which 1.1.0 skipped, and parameters and fields the client never exposed. The new parameters are optional and the methods keep their signatures. The exception is the `createdBy` and `color` type fixes below: code that read a property of a user object that was never there now gets a compile error instead of `undefined`.
 
 - **Reminder list filters** — covers the **Sep 25 2026** server release, which 1.1.0 skipped. `QuireReminderListOptions` gains `timing` and `status`, so `listReminders`, `listRemindersById` and `listTaskRemindersById` can send `?timing=` and `?status=`. Omitted, the list is unchanged.
     - `timing: "standalone"` lists the reminders firing at their own `when` (no task, or a task with neither a start nor a due date); `"anchored"` those firing from their task's date, whose `when` is null.
@@ -13,6 +15,9 @@
 - **Task list status filter** — `listTasks` and `listSubtasks` take `status` — `"active"`, `"completed"`, or one status value (0..100) — through the new exported `QuireTaskListOptions`, next to `limit` / `cursor`. It filters before paging. Covered by TPG6 in `tests/live/task-pagination.live.test.ts`.
 - **Comment flags on create** — `addComment(taskOid, text, { pinned, asUser })` pins the comment as it is created, or posts it as the app instead of the authorizing user. `addChatComment` takes `asUser` as well; it already took `pinned`. Covered by C1a and C5a in `tests/live/comment.live.test.ts`.
 - **`QuireTask.successorRefs` / `predecessorRefs`** — the `{oid, id}` companions to `successors` / `predecessors` from the May 2 2026 server release, which the client declared for approvals but not for tasks. Covered by T21 in `tests/live/task-deps.live.test.ts`.
+- **Fix: `createdBy` of a comment, tag or partner is a string** — `QuireComment.createdBy`, `QuireTag.createdBy` and `QuirePartner.createdBy` are typed `string`, the creator's user OID, which is what the server returns. The API doc gives a user object, as tasks, projects and the rest return, and the client followed it, so `comment.createdBy.name` compiled but was always `undefined`. The server keeps the string for compatibility (zkoss/boeneo#26017). A comment posted with `asUser: true` holds the app's agent OID, `ap|…`.
+    - `QuirePartner.color` is typed `string` (a palette code like `"37"`, as a tag's), not `number`, and `QuirePartner` declares `image`, `project` and `createdAt`.
+    - Covered by C1, TAG1 and PT1.
 - **Package metadata:** `homepage` points to the Quire API reference instead of the GitHub repo, which stays linked as `repository`. The link carries `utm_source=npm&utm_medium=referral&utm_campaign=api-client` so GA4 can attribute the visits; on quire.io/dev/api/ the tag stays out of Quire's signup-source stats. The README's status line no longer calls the package pre-1.0.
 
 ## 1.1.0 — 2026-10-16
