@@ -33,6 +33,8 @@ describe.skipIf(!hasTokens)("Live API — /tag", () => {
     expect(t.oid).toBeTruthy();
     expect(t.nameText ?? t.name).toBe(TAG_NAME);
     expect(t.color).toMatch(/^[0-5][0-7]$/);
+    // A bare user OID, not a user object (zkoss/boeneo#26017).
+    expect(typeof t.createdBy).toBe("string");
     tagOid = t.oid;
   });
 

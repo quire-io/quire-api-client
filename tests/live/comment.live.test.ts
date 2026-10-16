@@ -16,14 +16,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { QuireComment } from "../../src/index.js";
 import { hasTokens, liveClient, rawApi, readEnv, runTag } from "./helpers.js";
 
-// A comment's `createdBy` comes back as a bare OID string, not the user
-// object the API doc and `QuireComment` declare (tags and partners do the
-// same). Read the OID from either shape.
-function createdByOid(c: QuireComment): string | undefined {
-  const by: unknown = c.createdBy;
-  return typeof by === "string" ? by : (by as { oid?: string } | undefined)?.oid;
-}
-
 describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
   const client = liveClient();
   const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
@@ -47,6 +39,8 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
   it("C1 addComment creates a task comment", async () => {
     const c = await client.addComment(taskOid!, COMMENT_TEXT);
     expect(c.oid).toBeTruthy();
+    // A bare user OID, unlike `editedBy` / `pinBy` (zkoss/boeneo#26017).
+    expect(typeof c.createdBy).toBe("string");
     // Probe: does the create response include `url`? If so, add_comment
     // can surface a deep-link directly.
     console.log("[C1] task comment url field:", c.url);
@@ -62,7 +56,7 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
     });
     try {
       expect(c.pinAt).toBeTruthy();
-      expect(createdByOid(c)).toMatch(/^ap\|/);
+      expect(c.createdBy).toMatch(/^ap\|/);
     } finally {
       await client.deleteComment(c.oid).catch(() => {});
     }
@@ -179,7 +173,7 @@ describe.skipIf(!hasTokens)("Live API — /comment on a chat", () => {
       asUser: true,
     });
     try {
-      expect(createdByOid(c)).toMatch(/^ap\|/);
+      expect(c.createdBy).toMatch(/^ap\|/);
     } finally {
       await client.deleteComment(c.oid).catch(() => {});
     }

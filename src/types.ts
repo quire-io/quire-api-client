@@ -401,7 +401,9 @@ export interface QuireTag {
   nameHtml?: string;
   color?: string;
   url?: string;
-  createdBy?: { oid: string; id: string; name: string };
+  // The creator's user OID — a bare string, unlike a task's or project's
+  // user object (zkoss/boeneo#26017; kept for compatibility).
+  createdBy?: string;
   createdAt?: string;
   [key: string]: unknown;
 }
@@ -679,7 +681,12 @@ export interface QuireInsight {
 export interface QuirePartner {
   oid: string;
   name: string;
-  color?: number;
+  color?: string;
+  image?: string;
+  project?: { oid: string; id: string; name: string };
+  createdAt?: string;
+  // The creator's user OID, a bare string like a tag's.
+  createdBy?: string;
   [key: string]: unknown;
 }
 
@@ -696,7 +703,10 @@ export interface QuireComment {
   pinAt?: string;
   pinBy?: { oid: string; id: string; name: string };
   owner?: unknown;
-  createdBy?: { oid: string; id: string; name: string };
+  // The author's user OID — a bare string, while `editedBy` and `pinBy` are
+  // user objects (zkoss/boeneo#26017; kept for compatibility). A comment
+  // posted with `asUser: true` holds the app's agent OID, `ap|…`.
+  createdBy?: string;
   createdAt?: string;
   editedBy?: { oid: string; id: string; name: string };
   editedAt?: string;
