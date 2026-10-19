@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.3 — 2026-10-19
+
+Follows the rest of the **Oct 16 2026** server release; 1.2.2 covered its `createdBy` change. Apart from the `asUser` fix, nothing changes on the wire. The release's `400` for malformed nested `tasks` and its higher personal-project rate limits need nothing here.
+
+- **Fix: `approveTask`'s `comment.asUser` is a `boolean`**, as on `addComment`, not a `string`. The server acts only on `true`, so no string could post the comment as the app. Code that passed a string now fails to compile.
+    - The server still ignores it on `/task/approve`, though the API doc says it posts the comment as the app: the comment comes out as the authorizing user's. TA9 checks the documented behaviour and is expected to fail until the server is fixed.
+- **Approval comments** — `approveTask` and `bulkApproveTasks` describe the comment an approval logs as the server writes it and as the API doc now gives it. No code change.
+    - The header is a plain `<category>: <status>` line, no longer described as bold. The category name is left out for the default category, and the status is in the authorizing user's language, so don't parse it.
+    - `approve`, `reject` and `change` log the comment even without `comment`, holding only the header; `bulkApproveTasks` logs one on each task. `request` logs one only with `comment`.
+    - `category` takes the category's ID, not its name.
+    - Covered by TA7 and the new TA8 (header-only comment) and TA10 (a named category's header) in `tests/live/task-approve.live.test.ts`.
+- **Bulk batch size** — the bulk methods' comments give the new cap. No code change: the client can't know the plan, so it doesn't split batches.
+    - A batch holds at most 300 items, and no more than the plan's per-minute rate limit: e.g. 50 on the Free plan, or 25 in a personal project on the Free plan. A larger batch is `402` with body `code` `469`, like a plan limit; over 300 is `400`.
+    - In `bulkCreateTasks` / `bulkCreateSubtasks`, each nested task counts as an item, for both the cost and the cap. A `POST /task` with nested `tasks` is capped the same way.
+    - `formatQuireError`'s doc comment and the README's error table note that a `402` + `469` can mean an oversized batch, which splitting fixes too. Its message is unchanged and still shows the server's text.
+
 ## 1.2.2 — 2026-10-16
 
 - **Fix: `createdBy` of a comment, tag or partner is a user object again** — `QuireComment.createdBy`, `QuireTag.createdBy` and `QuirePartner.createdBy` are typed `{ oid, id, name }`, as in 1.1.0 and as the API doc gives. The Oct 16 2026 server release renders them so (zkoss/boeneo#26017); until then they were the creator's bare OID, which 1.2.0 typed as `string`. Code written against 1.2.0's `string` now fails to compile; read `createdBy.oid` for the OID.
