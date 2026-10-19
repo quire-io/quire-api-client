@@ -1163,7 +1163,12 @@ export class QuireClient {
   // Bulk task endpoints (Apr 27 2026)
   //
   // All bulk endpoints share an atomic-with-skip-not-found contract:
-  //   - Body is a top-level JSON array (1..300 items per call).
+  //   - Body is a top-level JSON array of 1..300 items, and no more than
+  //     the plan's per-minute rate limit (Oct 16 2026): e.g. 50 on the
+  //     Free plan, or 25 in a personal project on the Free plan. Over the
+  //     plan's cap is `402` with body `code` `469`, like a quota, but
+  //     upgrading isn't the only way out: split the batch. Over 300 is
+  //     `400`. The client doesn't split; it can't know the plan.
   //   - Response is a same-length array. `bulk-update` / `bulk-remove`
   //     return null in any slot whose target task could not be found
   //     (already-removed, never existed, cascade-removed by an earlier
@@ -1172,7 +1177,8 @@ export class QuireClient {
   //     whole batch and returns `{code, message}` with `items[i]:`
   //     prefixed so the caller can pinpoint the offending row.
   //   - Per-item rate-limit cost: each call costs N units (= the number
-  //     of submitted items); charged upfront before any item runs.
+  //     of submitted items; for `bulk-add`, every task created, nested
+  //     `tasks` included); charged upfront before any item runs.
   //   - Optional `?return=compact` renders `{oid, id}` (or `null`) per
   //     slot — strongly recommended for large batches to keep the
   //     response payload small. Wired here as the default for
@@ -1196,7 +1202,9 @@ export class QuireClient {
 
   // POST /task/bulk-add/{projectOid} — N root tasks. Items can include
   // nested `tasks` to create subtrees in the same call (only the root of
-  // each item is echoed in the response).
+  // each item is echoed in the response). Since Oct 16 2026 each nested
+  // task costs a rate-limit unit and counts toward the batch cap, so a
+  // 10-item batch with 5 subtasks each is 60 tasks: over the Free plan's 50.
   async bulkCreateTasks(
     projectOid: string,
     items: Array<Record<string, unknown>>,
@@ -1331,12 +1339,16 @@ export class QuireClient {
 
   // POST /task/bulk-approve/{projectOid}?state=<state>&category=<cat> —
   // refs in the body. Reuses the single-task approve grammar (state token
-  // selects `request` / `approve` / `reject` / `change`).
+  // selects `request` / `approve` / `reject` / `change`). Like
+  // `approveTask` without a comment, `approve` / `reject` / `change` log a
+  // header-only comment on each task, and `request` logs none; there is
+  // no comment text to send.
   async bulkApproveTasks(
     projectOid: string,
     refs: Array<string | number>,
     options: {
       state: "request" | "approve" | "reject" | "change";
+      /** The approval category's ID, not its name. Omitted, the project's default category (ID `""`). */
       category?: string;
       return?: "compact" | "full";
       dryRun?: boolean;
@@ -1494,14 +1506,16 @@ export class QuireClient {
   // POST /task/approve handles every state transition — the `state` query
   // param selects the action (`request`, `approve`, `reject`, `change`).
   // Apr 27 moved state/category from the request body to the query string
-  // so the grammar matches the bulk-approve endpoint. May 27 2026 reused
-  // the request body for an optional companion comment: when `comment` is
-  // supplied, the server posts a comment on the task as a side effect of
-  // the approval, prefixed with a header line naming the decision and a
-  // blank line. Don't parse the header: the API doc gives
-  // `**<stream>: <status>**`, but production stores a plain `Approved` for
-  // the default stream (TA7). The approval response shape is unchanged —
-  // fetch the created comment via `/comment/list/{taskOid}` if needed.
+  // so the grammar matches the bulk-approve endpoint. `approve` / `reject` /
+  // `change` log a comment on the task holding a plain `<category>:
+  // <status>` header line, as the apps do; `request` logs none. May 27
+  // 2026 reused the request body for an optional companion comment: its
+  // `description` follows the header after a blank line, and with it
+  // `request` logs a comment too. Don't parse the header: the category
+  // name is left out for the default category, and the status is in the
+  // authorizing user's language (`Approved` in English) (TA7, TA8). The
+  // approval response shape is unchanged — fetch the created comment via
+  // `/comment/list/{taskOid}` if needed.
   // Response is the Approval object only (not the full task). DELETE
   // /task/revoke-approval returns 204 with no body in all three cases:
   // rolling back approved/rejected → awaiting, clearing awaiting/changes
@@ -1517,20 +1531,24 @@ export class QuireClient {
     taskOid: string,
     body: {
       state: "request" | "approve" | "reject" | "change";
+      /** The approval category's ID, not its name. Omitted, the project's default category (ID `""`). */
       category?: string;
       compact?: Compact;
       /**
-       * Optional companion comment posted on the task as a side effect of
-       * the approval (May 27 2026). `description` is required when supplied;
-       * the server prefixes the stored comment with a header line naming
-       * the decision and a blank line — its wording isn't stable, so don't
-       * parse it. The created comment is not part of the approval
-       * response — fetch it via `getTaskComments` afterward.
+       * Optional text for the comment the approval logs on the task (May 27
+       * 2026). `description` is required when supplied; the server puts a
+       * plain `<category>: <status>` header line and a blank line before it.
+       * The header's wording follows the authorizing user's language, so
+       * don't parse it. Without `comment`, `approve` / `reject` / `change`
+       * still log a header-only comment and `request` logs none. The
+       * created comment is not part of the approval response — fetch it
+       * via `getTaskComments` afterward. `asUser: true` is documented to
+       * post it as the app, but the server still posts it as the user (TA9).
        */
       comment?: {
         description: string;
         pinned?: boolean;
-        asUser?: string;
+        asUser?: boolean;
       };
     },
   ): Promise<Compact extends true ? QuireCompactRef : QuireApproval> {

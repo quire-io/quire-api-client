@@ -1,5 +1,5 @@
 /**
- * Live API tests for the task approval workflow (TA1-TA6).
+ * Live API tests for the task approval workflow (TA1-TA10).
  *
  * Apr 27 2026 contract: state and category live in query parameters, not
  * the body. `?return=compact` returns `{oid, id}` (was `{oid}` only).
@@ -136,7 +136,7 @@ describe.skipIf(!hasTokens)("Live API — /task/approve + /revoke-approval", () 
 
   // May 27 2026: /task/approve accepts an optional companion comment that
   // is posted on the task as a side effect of the approval. The stored
-  // comment is prefixed with a header line and a blank line. The approval
+  // comment is a header line, a blank line, then the text. The approval
   // response shape is unchanged — fetch the comment via getTaskComments to
   // verify it landed.
   it("TA7 approveTask({state:'approve',comment:{description}}) posts a prefixed comment", async () => {
@@ -156,13 +156,110 @@ describe.skipIf(!hasTokens)("Live API — /task/approve + /revoke-approval", () 
     );
     expect(match).toBeDefined();
     // Server-applied header, a blank line, then the body. Only the shape is
-    // pinned: the API doc gives the header as `**<stream>: <status>**`, but
-    // production stores a plain `Approved` for the default stream.
+    // pinned: the status is in the authorizing user's language. It is a
+    // plain line, not the bold `**<stream>: <status>**` the API doc gave
+    // until Oct 16 2026.
     const [header, ...rest] = match!.description!.split("\n\n");
-    expect(header!.length).toBeGreaterThan(0);
+    expectPlainHeader(header!);
     expect(header).not.toContain(description);
     expect(rest.join("\n\n")).toBe(description);
 
     await client.revokeTaskApproval(taskOid);
   });
+
+  // Without a body, `approve` / `reject` / `change` still log a comment
+  // holding only the header, as the apps do; `request` logs none.
+  it("TA8 approveTask without a comment logs a header-only comment on approve, none on request", async () => {
+    await clearApproval();
+    const before = await commentOids();
+
+    await client.approveTask(taskOid, { state: "request" });
+    expect(await newComments(before)).toEqual([]);
+
+    await client.approveTask(taskOid, { state: "approve" });
+    const added = await newComments(before);
+    expect(added).toHaveLength(1);
+    expectPlainHeader(added[0]!.description!);
+
+    await clearApproval();
+  });
+
+  // `comment.asUser` is a boolean, as on addComment; the `string` the
+  // client typed until 1.2.3 could never be `true`. The server accepts the
+  // field but still posts as the user: /task/approve is an API extension,
+  // and only the generic create / update paths in boeneo's invoke.dart
+  // apply `asUser`. Expected to fail until the server applies it there;
+  // turn this back into `it` then.
+  it.fails("TA9 approveTask({comment:{asUser:true}}) posts the comment as the app", async () => {
+    const description = `TA9 app note ${runTag}`;
+    await clearApproval();
+
+    await client.approveTask(taskOid, { state: "request" });
+    await client.approveTask(taskOid, {
+      state: "approve",
+      comment: { description, asUser: true },
+    });
+
+    const comments = await client.getTaskComments(taskOid);
+    const match = comments.find((c) => c.description?.endsWith(description));
+    expect(match).toBeDefined();
+    expect(match!.createdBy?.id).toMatch(/^ap\|/);
+
+    await clearApproval();
+  });
+
+  // `category` is the category's ID; the header names it by its name.
+  it("TA10 a named category's header starts with the category's name", async () => {
+    const catId = `${runTag}-ta10`;
+    const catName = `${runTag}-TA10 Review`;
+    const description = `TA10 note ${runTag}`;
+    await clearApproval();
+    await client.addProjectApprovalCategory(PROJECT_OID, {
+      id: catId,
+      name: catName,
+    });
+    try {
+      await client.approveTask(taskOid, { state: "request", category: catId });
+      await client.approveTask(taskOid, {
+        state: "approve",
+        category: catId,
+        comment: { description },
+      });
+
+      const comments = await client.getTaskComments(taskOid);
+      const match = comments.find((c) => c.description?.endsWith(description));
+      expect(match).toBeDefined();
+      const [header] = match!.description!.split("\n\n");
+      expectPlainHeader(header!);
+      expect(header!.startsWith(`${catName}: `)).toBe(true);
+    } finally {
+      await clearApproval().catch(() => {});
+      await client
+        .removeProjectApprovalCategory(PROJECT_OID, catId)
+        .catch(() => {});
+    }
+  });
+
+  // Revoking twice clears an approval from any state: approved / rejected
+  // → awaiting → none, and a revoke with nothing to clear is a no-op.
+  async function clearApproval(): Promise<void> {
+    await client.revokeTaskApproval(taskOid);
+    await client.revokeTaskApproval(taskOid);
+  }
+
+  async function commentOids(): Promise<Set<string>> {
+    return new Set((await client.getTaskComments(taskOid)).map((c) => c.oid));
+  }
+
+  async function newComments(before: Set<string>) {
+    return (await client.getTaskComments(taskOid)).filter(
+      (c) => !before.has(c.oid),
+    );
+  }
+
+  function expectPlainHeader(header: string): void {
+    expect(header.length).toBeGreaterThan(0);
+    expect(header).not.toContain("\n");
+    expect(header).not.toMatch(/^\*\*/);
+  }
 });

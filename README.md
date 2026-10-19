@@ -387,7 +387,7 @@ Since the Sep 21 2026 server release the HTTP status carries the category and th
 
 | Status + body `code` | Meaning | What helps |
 |---|---|---|
-| `402` + `469` | Plan limit or quota (tasks, custom fields, dashboard, insight, sublist, chat, doc) | Upgrading. Retrying never does. |
+| `402` + `469` | Plan limit or quota (tasks, custom fields, dashboard, insight, sublist, chat, doc), or a bulk call / nested task create over the plan's per-call cap | Upgrading, or for an oversized batch, splitting it. Retrying as is never does. |
 | `402` + `470` | Subscription **expired** | Resubscribing — no in-plan upgrade clears it |
 | `403` + `471` | Account temporarily blocked | Waiting, or contacting Quire |
 | `429` | The per-minute / per-hour API rate limit, and only this | Backing off; always carries `Retry-After` |

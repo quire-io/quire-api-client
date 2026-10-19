@@ -8,7 +8,9 @@
  *     or a duplicate / reserved id). Previously these carried `code: 469`.
  *   - 402 with `code: 469` → a plan limit or quota (task limit, custom
  *     fields, dashboard, insight, sublist, chat, doc). Retrying never
- *     helps; upgrading does.
+ *     helps; upgrading does. Since Oct 16 2026 it is also a bulk call, or
+ *     a task create with nested `tasks`, holding more items than the
+ *     plan's per-minute rate limit; splitting it helps too.
  *   - 402 with `code: 470` → the subscription has EXPIRED. Distinct from a
  *     plan limit: only resubscribing clears it, and no upgrade path within
  *     the current plan applies.
