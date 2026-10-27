@@ -849,3 +849,86 @@ describe("comment emoji reactions (Oct 15 2026)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("custom-field names go in the query (Oct 23 2026)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn().mockImplementation(async () => jsonResponse({}));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  function lastCall(): [string, RequestInit] {
+    return fetchMock.mock.calls.at(-1)! as [string, RequestInit];
+  }
+
+  // A slash, a space and a literal `+`: the path form can't carry a `/`,
+  // and a query reads `+` as a space, so it must go out as `%2B`.
+  const name = "Over/Under +1";
+  const encoded = "Over%2FUnder+%2B1";
+
+  it("project: update / rename / move / remove send ?name=", async () => {
+    const client = mkClient();
+
+    await client.updateProjectField("oid-p1", name, { hidden: true });
+    expect(lastCall()[0]).toBe(
+      `https://quire.io/api/project/update-field/oid-p1?name=${encoded}`,
+    );
+    expect(lastCall()[1].method).toBe("PUT");
+    expect(lastCall()[1].body).toBe(JSON.stringify({ hidden: true }));
+
+    await client.renameProjectField("oid-p1", name, "A/B");
+    expect(lastCall()[0]).toBe(
+      `https://quire.io/api/project/rename-field/oid-p1?name=${encoded}&new-name=A%2FB`,
+    );
+
+    await client.moveProjectField("oid-p1", name, "Due date");
+    expect(lastCall()[0]).toBe(
+      `https://quire.io/api/project/move-field/oid-p1?name=${encoded}&before=Due+date`,
+    );
+    await client.moveProjectField("oid-p1", name);
+    expect(lastCall()[0]).toBe(
+      `https://quire.io/api/project/move-field/oid-p1?name=${encoded}`,
+    );
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await client.removeProjectField("oid-p1", name);
+    expect(lastCall()[0]).toBe(
+      `https://quire.io/api/project/remove-field/oid-p1?name=${encoded}`,
+    );
+    expect(lastCall()[1].method).toBe("DELETE");
+  });
+
+  it("insight: update / rename / move / remove send ?name=", async () => {
+    const client = mkClient();
+
+    await client.updateInsightField("oid-i1", name, { formula: "1" });
+    expect(lastCall()[0]).toBe(
+      `https://quire.io/api/insight/update-field/oid-i1?name=${encoded}`,
+    );
+
+    await client.renameInsightField("oid-i1", name, "A/B");
+    expect(lastCall()[0]).toBe(
+      `https://quire.io/api/insight/rename-field/oid-i1?name=${encoded}&new-name=A%2FB`,
+    );
+
+    await client.moveInsightField("oid-i1", name, null);
+    expect(lastCall()[0]).toBe(
+      `https://quire.io/api/insight/move-field/oid-i1?name=${encoded}`,
+    );
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await client.removeInsightField("oid-i1", name);
+    expect(lastCall()[0]).toBe(
+      `https://quire.io/api/insight/remove-field/oid-i1?name=${encoded}`,
+    );
+  });
+});

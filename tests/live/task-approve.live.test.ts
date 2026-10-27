@@ -185,12 +185,10 @@ describe.skipIf(!hasTokens)("Live API — /task/approve + /revoke-approval", () 
   });
 
   // `comment.asUser` is a boolean, as on addComment; the `string` the
-  // client typed until 1.2.3 could never be `true`. The server accepts the
-  // field but still posts as the user: /task/approve is an API extension,
-  // and only the generic create / update paths in boeneo's invoke.dart
-  // apply `asUser`. Expected to fail until the server applies it there;
-  // turn this back into `it` then.
-  it.fails("TA9 approveTask({comment:{asUser:true}}) posts the comment as the app", async () => {
+  // client typed until 1.2.3 could never be `true`. The server ignored it
+  // until its Oct 19 2026 release (zkoss/boeneo#26031), posting the
+  // comment as the user.
+  it("TA9 approveTask({comment:{asUser:true}}) posts the comment as the app", async () => {
     const description = `TA9 app note ${runTag}`;
     await clearApproval();
 

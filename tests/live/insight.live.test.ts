@@ -136,9 +136,12 @@ describe.skipIf(!hasTokens)("Live API — /insight/*-field", () => {
   const client = liveClient();
   const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
   const insightName = `${runTag}-insight-field-host`;
-  const fieldA = `${runTag}-ifa`;
-  const fieldARenamed = `${fieldA}-renamed`;
-  const fieldB = `${runTag}-ifb`;
+  // Names that need encoding, as in the project-field tests: the server
+  // didn't decode a name in the path until Oct 23 2026, and a `/` needs
+  // the `?name=` form.
+  const fieldA = `${runTag} Cycle Time/days`;
+  const fieldARenamed = `${runTag} Cycle Time (days)`;
+  const fieldB = `${runTag} Owner +1`;
   let insightOid: string | undefined;
 
   type InsightWithFields = QuireInsight & {
@@ -214,9 +217,29 @@ describe.skipIf(!hasTokens)("Live API — /insight/*-field", () => {
       lookupType: "user",
     });
 
+    const order = async () =>
+      Object.keys(
+        ((await client.getInsight(insightOid!)) as InsightWithFields).fields ?? {},
+      );
+
     await client.moveInsightField(insightOid!, fieldB, fieldARenamed);
-    // Without `before` → move to the end. Just checks the call doesn't 400.
+    let keys = await order();
+    expect(keys.indexOf(fieldB)).toBe(keys.indexOf(fieldARenamed) - 1);
+
+    // Without `before` → move to the end.
     await client.moveInsightField(insightOid!, fieldB);
+    keys = await order();
+    expect(keys.at(-1)).toBe(fieldB);
+  });
+
+  it("IF4b a missing field is 404 and a taken name 409", async () => {
+    const missing = `${runTag} missing/field`;
+    await expect(
+      client.updateInsightField(insightOid!, missing, { formula: "1" }),
+    ).rejects.toThrow(/Quire API error 404/);
+    await expect(
+      client.renameInsightField(insightOid!, fieldARenamed, fieldB),
+    ).rejects.toThrow(/Quire API error 409/);
   });
 
   it("IF5 removeInsightField removes both fields", async () => {

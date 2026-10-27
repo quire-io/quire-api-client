@@ -192,6 +192,7 @@ function renderSubstitution(expr) {
     const name = e.expression.text;
     if (name === "toSearchQueryString") return "[?…]";
     if (name === "listPagingQuery") return "[?limit&cursor]";
+    if (name === "fieldNameQuery") return renderFieldNameQuery(e);
   }
   // Ternary like `before ? \`?before=${...}\` : ""` — render both branches.
   if (ts.isConditionalExpression(e)) {
@@ -200,6 +201,32 @@ function renderSubstitution(expr) {
     if (t !== null && f !== null) return f === "" ? `[${t}]` : `[${t}|${f}]`;
   }
   return `{${truncate(e.getText(sf), 30)}}`;
+}
+
+// fieldNameQuery(fieldName, { "new-name": newName }) →
+// `?name={fieldName}&new-name={newName}`; a conditional extra such as
+// `before ? { before } : {}` renders as optional: `[&before={before}]`.
+function renderFieldNameQuery(call) {
+  const [nameArg, extra] = call.arguments;
+  return `?name=${renderSubstitution(nameArg)}${extra ? renderQueryObject(extra) : ""}`;
+}
+
+function renderQueryObject(node) {
+  if (ts.isConditionalExpression(node)) {
+    const t = renderQueryObject(node.whenTrue);
+    const f = renderQueryObject(node.whenFalse);
+    return f === "" ? `[${t}]` : `[${t}|${f}]`;
+  }
+  if (ts.isObjectLiteralExpression(node)) {
+    return node.properties
+      .map((p) => {
+        if (ts.isShorthandPropertyAssignment(p)) return `&${p.name.text}={${p.name.text}}`;
+        if (ts.isPropertyAssignment(p)) return `&${p.name.text}=${renderSubstitution(p.initializer)}`;
+        return "&…";
+      })
+      .join("");
+  }
+  return "&…";
 }
 
 function truncate(s, n) {

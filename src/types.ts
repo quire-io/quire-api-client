@@ -330,6 +330,9 @@ export interface QuireTask {
   // Recurrence spec — see QuireRecurrence above and docs/quire-recurring.md.
   // Null when the task has no active recurrence (or field absent on read).
   recurrence?: QuireRecurrence | null;
+  // Omitted for a guest member, and for a non-member of a public project,
+  // when the project hides time logs from guests (its default) — since the
+  // Oct 23 2026 server release.
   timelogs?: QuireTimelog[];
   // Task dependencies round-trip as `"#<numeric-id>"` strings, not { oid }
   // objects. Quire edits only the `successors` side via PUT /task/{oid};

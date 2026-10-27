@@ -23,7 +23,9 @@ import { hasTokens, liveClient, readEnv, runTag } from "./helpers.js";
 describe.skipIf(!hasTokens)("Live API — /task/attach", () => {
   const client = liveClient();
   const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
-  const FILE_NAME = `${runTag}-attach.md`;
+  // A space checks the server decodes the name (Oct 23 2026); it used to
+  // save `My%20Report.md` as is.
+  const FILE_NAME = `${runTag} attach.md`;
   const FILE_BODY = `# ${runTag}\n\nProbe payload for the attach contract.\n`;
   const FILE_BYTES = new TextEncoder().encode(FILE_BODY);
 
@@ -73,7 +75,7 @@ describe.skipIf(!hasTokens)("Live API — /task/attach", () => {
 describe.skipIf(!hasTokens)("Live API — /comment/attach", () => {
   const client = liveClient();
   const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
-  const FILE_NAME = `${runTag}-comment-attach.md`;
+  const FILE_NAME = `${runTag} comment attach.md`;
   const FILE_BODY = `# ${runTag}\n\nProbe payload for comment attachment.\n`;
   const FILE_BYTES = new TextEncoder().encode(FILE_BODY);
 

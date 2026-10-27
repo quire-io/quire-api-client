@@ -241,6 +241,19 @@ function flattenCustomFields<T extends { customFields?: Record<string, unknown> 
   return { ...(customFields ?? {}), ...rest };
 }
 
+// Oct 23 2026: the update / rename / move / remove field endpoints, of a
+// project or an insight, take the field's name in the query (`?name=`, and
+// rename's `&new-name=`) instead of the path, so a name may contain `/`
+// (zkoss/boeneo#26048). URLSearchParams sends a space as `+` and a `+` as
+// `%2B`, as the server reads them. The path form still works but is
+// deprecated, and sending both is `400`.
+function fieldNameQuery(
+  fieldName: string,
+  more: Record<string, string> = {},
+): string {
+  return `?${new URLSearchParams({ name: fieldName, ...more }).toString()}`;
+}
+
 // Apr 27 2026: /task/list and /task/search gained opt-in cursor pagination
 // via `?limit=N` and `?cursor=<token>`. With more pages to come, the LAST
 // item in the response carries `"cursor": "<token>"`; passing it back as
@@ -605,10 +618,17 @@ export class QuireClient {
   // Project custom-field definitions — Apr 22 2026
   //
   // Each operation addresses a definition by the project OID + the field's
-  // display name. Name is URL-encoded since display names can include
-  // spaces and punctuation. Response shape mirrors `FieldDefinition` in the
-  // Quire API reference; the project's GET response embeds the same shape
-  // under `fields` keyed by name.
+  // display name, sent as `?name=` (see fieldNameQuery). Response shape
+  // mirrors `FieldDefinition` in the Quire API reference; the project's GET
+  // response embeds the same shape under `fields` keyed by name.
+  //
+  // Since Oct 23 2026: update / rename / move on a missing field, or with a
+  // missing `before` field, are `404`; add, or a rename to a name already
+  // taken, is `409`; remove of a missing field stays `204`. A caller who
+  // isn't an admin gets `403` before any of these, so a 404 or 409 never
+  // reveals a field name. Before, the path form didn't decode the name, so
+  // any name needing encoding (`Billable Amount`) was never found and the
+  // call reported success without changing anything.
   // -----------------------------------------------------------------------
 
   // `QuireFieldAccess` (Oct 15 2026) types who can view and edit the values;
@@ -631,7 +651,7 @@ export class QuireClient {
     body: QuireFieldAccess & Record<string, unknown>,
   ): Promise<QuireFieldDefinition> {
     return this.fetch<QuireFieldDefinition>(
-      `/project/update-field/${projectOid}/${encodeURIComponent(fieldName)}`,
+      `/project/update-field/${projectOid}${fieldNameQuery(fieldName)}`,
       { method: "PUT", body: JSON.stringify(body) },
     );
   }
@@ -642,7 +662,7 @@ export class QuireClient {
     newName: string,
   ): Promise<QuireFieldDefinition> {
     return this.fetch<QuireFieldDefinition>(
-      `/project/rename-field/${projectOid}/${encodeURIComponent(fieldName)}/${encodeURIComponent(newName)}`,
+      `/project/rename-field/${projectOid}${fieldNameQuery(fieldName, { "new-name": newName })}`,
       { method: "PUT" },
     );
   }
@@ -654,9 +674,8 @@ export class QuireClient {
     fieldName: string,
     before?: string | null,
   ): Promise<QuireFieldDefinition> {
-    const qs = before ? `?before=${encodeURIComponent(before)}` : "";
     return this.fetch<QuireFieldDefinition>(
-      `/project/move-field/${projectOid}/${encodeURIComponent(fieldName)}${qs}`,
+      `/project/move-field/${projectOid}${fieldNameQuery(fieldName, before ? { before } : {})}`,
       { method: "PUT" },
     );
   }
@@ -666,7 +685,7 @@ export class QuireClient {
     fieldName: string,
   ): Promise<void> {
     await this.fetch<void>(
-      `/project/remove-field/${projectOid}/${encodeURIComponent(fieldName)}`,
+      `/project/remove-field/${projectOid}${fieldNameQuery(fieldName)}`,
       { method: "DELETE" },
     );
   }
@@ -1447,8 +1466,10 @@ export class QuireClient {
   // POST /task/attach/{taskOid}/{filename} — raw bytes in the request body,
   // not multipart, not JSON. The server forwards Content-Type to S3 and uses
   // Content-Length for quota gating; both are derived from the Uint8Array
-  // by the runtime. Filename in the URL is path-segment-encoded; the server
-  // rejects names containing `/`. Verified by A1/A2 in
+  // by the runtime. Filename in the URL is path-segment-encoded, and the
+  // server decodes it (since Oct 23 2026; before, `My Report.md` was saved
+  // as `My%20Report.md`). It rejects names containing `/` or `\`. Verified
+  // by A1/A2 in
   // tests/quire_api/attachment.test.ts. Server response is the freshly-
   // attached entry — its `url` is absolute on this endpoint.
   async attachTaskFile(
@@ -1542,8 +1563,9 @@ export class QuireClient {
        * don't parse it. Without `comment`, `approve` / `reject` / `change`
        * still log a header-only comment and `request` logs none. The
        * created comment is not part of the approval response — fetch it
-       * via `getTaskComments` afterward. `asUser: true` is documented to
-       * post it as the app, but the server still posts it as the user (TA9).
+       * via `getTaskComments` afterward. `asUser: true` posts it as the app
+       * (since the Oct 19 2026 server release); the approval stays the
+       * user's (TA9).
        */
       comment?: {
         description: string;
@@ -2184,7 +2206,7 @@ export class QuireClient {
     body: QuireFieldAccess & Record<string, unknown>,
   ): Promise<QuireFieldDefinition> {
     return this.fetch<QuireFieldDefinition>(
-      `/insight/update-field/${insightOid}/${encodeURIComponent(fieldName)}`,
+      `/insight/update-field/${insightOid}${fieldNameQuery(fieldName)}`,
       { method: "PUT", body: JSON.stringify(body) },
     );
   }
@@ -2195,7 +2217,7 @@ export class QuireClient {
     newName: string,
   ): Promise<QuireFieldDefinition> {
     return this.fetch<QuireFieldDefinition>(
-      `/insight/rename-field/${insightOid}/${encodeURIComponent(fieldName)}/${encodeURIComponent(newName)}`,
+      `/insight/rename-field/${insightOid}${fieldNameQuery(fieldName, { "new-name": newName })}`,
       { method: "PUT" },
     );
   }
@@ -2205,9 +2227,8 @@ export class QuireClient {
     fieldName: string,
     before?: string | null,
   ): Promise<QuireFieldDefinition> {
-    const qs = before ? `?before=${encodeURIComponent(before)}` : "";
     return this.fetch<QuireFieldDefinition>(
-      `/insight/move-field/${insightOid}/${encodeURIComponent(fieldName)}${qs}`,
+      `/insight/move-field/${insightOid}${fieldNameQuery(fieldName, before ? { before } : {})}`,
       { method: "PUT" },
     );
   }
@@ -2217,7 +2238,7 @@ export class QuireClient {
     fieldName: string,
   ): Promise<void> {
     await this.fetch<void>(
-      `/insight/remove-field/${insightOid}/${encodeURIComponent(fieldName)}`,
+      `/insight/remove-field/${insightOid}${fieldNameQuery(fieldName)}`,
       { method: "DELETE" },
     );
   }

@@ -218,9 +218,14 @@ describe.skipIf(!hasTokens)("Live API — /project", () => {
 describe.skipIf(!hasTokens)("Live API — /project/*-field (custom-field definitions)", () => {
   const client = liveClient();
   const PROJECT_OID = readEnv("QUIRE_TEST_PROJECT_OID");
-  const fieldA = `${runTag}-fa`;
-  const fieldARenamed = `${fieldA}-renamed`;
-  const fieldB = `${runTag}-fb`;
+  // Names that need encoding: a space, a `/` (the old path form couldn't
+  // carry one) and a `+` (a space in a query unless sent as `%2B`). Until
+  // Oct 23 2026 the server didn't decode the path, so such a name was never
+  // found and update / remove reported success without a change
+  // (zkoss/boeneo#26048).
+  const fieldA = `${runTag} Over/Under +1`;
+  const fieldARenamed = `${runTag} A/B renamed`;
+  const fieldB = `${runTag} Billable Amount`;
 
   type ProjectWithFields = QuireProject & {
     fields?: Record<string, QuireFieldDefinition>;
@@ -278,8 +283,40 @@ describe.skipIf(!hasTokens)("Live API — /project/*-field (custom-field definit
       name: fieldB,
       type: "number",
     });
+    const order = async () =>
+      Object.keys(
+        ((await client.getProject(PROJECT_OID)) as ProjectWithFields).fields ?? {},
+      );
+
     await client.moveProjectField(PROJECT_OID, fieldB, fieldARenamed);
+    let keys = await order();
+    expect(keys.indexOf(fieldB)).toBe(keys.indexOf(fieldARenamed) - 1);
+
     await client.moveProjectField(PROJECT_OID, fieldB);
+    keys = await order();
+    expect(keys.at(-1)).toBe(fieldB);
+  });
+
+  // Oct 23 2026: a missing field is 404 and a taken name 409, where the
+  // server used to answer 200 without a change; removing a missing field
+  // stays 204.
+  it("PF4b a missing field is 404, a taken name 409, and removing a missing field succeeds", async () => {
+    const missing = `${runTag} missing/field`;
+    await expect(
+      client.updateProjectField(PROJECT_OID, missing, { hidden: true }),
+    ).rejects.toThrow(/Quire API error 404/);
+    await expect(
+      client.moveProjectField(PROJECT_OID, fieldB, missing),
+    ).rejects.toThrow(/Quire API error 404/);
+    await expect(
+      client.addProjectField(PROJECT_OID, { name: fieldB, type: "number" }),
+    ).rejects.toThrow(/Quire API error 409/);
+    await expect(
+      client.renameProjectField(PROJECT_OID, fieldARenamed, fieldB),
+    ).rejects.toThrow(/Quire API error 409/);
+    await expect(
+      client.removeProjectField(PROJECT_OID, missing),
+    ).resolves.toBeUndefined();
   });
 
   it("PF5 removeProjectField removes both fields", async () => {

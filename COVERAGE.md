@@ -49,10 +49,10 @@ Generated from 129 client methods covering 135 endpoints across 25 sections.
 | Method | HTTP | Endpoint |
 |---|---|---|
 | `addProjectField` | `POST` | `/api/project/add-field/{projectOid}` |
-| `updateProjectField` | `PUT` | `/api/project/update-field/{projectOid}/{fieldName}` |
-| `renameProjectField` | `PUT` | `/api/project/rename-field/{projectOid}/{fieldName}/{newName}` |
-| `moveProjectField` | `PUT` | `/api/project/move-field/{projectOid}/{fieldName}[?…]` |
-| `removeProjectField` | `DELETE` | `/api/project/remove-field/{projectOid}/{fieldName}` |
+| `updateProjectField` | `PUT` | `/api/project/update-field/{projectOid}?name={fieldName}` |
+| `renameProjectField` | `PUT` | `/api/project/rename-field/{projectOid}?name={fieldName}&new-name={newName}` |
+| `moveProjectField` | `PUT` | `/api/project/move-field/{projectOid}?name={fieldName}[&before={before}]` |
+| `removeProjectField` | `DELETE` | `/api/project/remove-field/{projectOid}?name={fieldName}` |
 
 ## Project approval categories — Apr 24 2026
 
@@ -229,10 +229,10 @@ Generated from 129 client methods covering 135 endpoints across 25 sections.
 | Method | HTTP | Endpoint |
 |---|---|---|
 | `addInsightField` | `POST` | `/api/insight/add-field/{insightOid}` |
-| `updateInsightField` | `PUT` | `/api/insight/update-field/{insightOid}/{fieldName}` |
-| `renameInsightField` | `PUT` | `/api/insight/rename-field/{insightOid}/{fieldName}/{newName}` |
-| `moveInsightField` | `PUT` | `/api/insight/move-field/{insightOid}/{fieldName}[?…]` |
-| `removeInsightField` | `DELETE` | `/api/insight/remove-field/{insightOid}/{fieldName}` |
+| `updateInsightField` | `PUT` | `/api/insight/update-field/{insightOid}?name={fieldName}` |
+| `renameInsightField` | `PUT` | `/api/insight/rename-field/{insightOid}?name={fieldName}&new-name={newName}` |
+| `moveInsightField` | `PUT` | `/api/insight/move-field/{insightOid}?name={fieldName}[&before={before}]` |
+| `removeInsightField` | `DELETE` | `/api/insight/remove-field/{insightOid}?name={fieldName}` |
 
 ## Dashboards — Jul 20 2026
 
