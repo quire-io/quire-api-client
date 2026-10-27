@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.4 — 2026-10-27
+
+Follows the **Oct 19** and **Oct 23 2026** server releases (production build 1861). Method signatures don't change.
+
+- **Custom-field names go in the query** (zkoss/boeneo#26048) — `updateProjectField`, `renameProjectField`, `moveProjectField` and `removeProjectField`, and their four insight counterparts, send the field's name as `?name=` (rename's new name as `&new-name=`) instead of in the path.
+    - A name with a `/`, such as `Over/Under`, now works; in the path it was rejected with `400`.
+    - Until the Oct 23 server release, the path form didn't decode the name, so any name needing encoding (`Billable Amount`, `External ID`) was never found. An update, rename, move or remove of such a field returned success and changed nothing, and adding one again kept the old definition. The server now decodes the path too, but it is deprecated.
+    - The server's new answers, in the methods' comments: a missing field, or a missing `before` field, is `404` on update, rename and move, where it was `200`; add, or a rename to a name already taken, is `409`; removing a missing field stays `204`. A caller who isn't an admin gets `403` before any of them.
+    - Covered by the new offline tests in `src/__tests__/client.test.ts`, and by PF1-PF5 and IF1-IF5, which now use names with a space, a `/` and a `+`, plus PF4b and IF4b for `404` / `409`. PF4 and IF4 now check the order a move gives.
+- **`approveTask`'s `comment.asUser: true` posts the comment as the app** — the Oct 19 server release applies it (zkoss/boeneo#26031); the approval stays the user's. TA9 is a plain test again, and the JSDoc no longer says the server ignores it.
+- **Attachment names** — `attachTaskFile` and `attachCommentFile` already encode the file name, and since the Oct 23 server release the server decodes it: `My Report.md` used to be saved as `My%20Report.md`. Their comments note it, and that a name can't contain `/` or `\`. A1-A4 in `tests/live/attachment.live.test.ts` now use names with spaces.
+- **`QuireTask.timelogs`** notes that it is omitted for a guest member, and for a non-member of a public project, when the project hides time logs from guests, as the Oct 23 server release does.
+- The Oct 19 release honors `asUser` on each item of `bulk-add` and `bulk-update`; a nested task's must match its top-level task's. The items pass through as given, so nothing changes here.
+- `COVERAGE.md` shows the field endpoints' `?name=` query: the generator reads the new `fieldNameQuery` helper.
+
 ## 1.2.3 — 2026-10-19
 
 Follows the rest of the **Oct 16 2026** server release; 1.2.2 covered its `createdBy` change. Apart from the `asUser` fix, nothing changes on the wire. The release's `400` for malformed nested `tasks` and its higher personal-project rate limits need nothing here.
