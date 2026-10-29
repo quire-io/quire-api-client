@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.5 — 2026-10-29
+
+Follows the **Oct 29 2026** server release (production build 1862). Closes #1.
+
+- **`createSublist` takes `start`, `due` and `includes`** — the API doc now lists `start` / `due` only on a sublist, which the server accepts; `updateSublist` and `QuireSublist` already had them. `includes` lists task OIDs to put in the new sublist, each with all its descendants; the API doc has listed it, but the client didn't take it. Covered by the new SL12 and SL13.
+- **Followers of a new task, doc or chat** — only the users in `followers`, plus anyone @mentioned in a task's or doc's description, follow it. The server no longer adds the current user; pass `"me"` to keep them following. The comments on `createTask`, `createSubtask`, `createTaskRelative` and `createChat`, and the README's Followers notes, said the caller was added automatically; they now say this, and `createDocument`'s says it too. No code change. Covered by the new TF0; TF1 already passed `"me"`.
+- The same release makes the authorizing user, not the app, follow a task or chat when a comment is posted. Nothing changes here.
+
 ## 1.2.4 — 2026-10-27
 
 Follows the **Oct 19** and **Oct 23 2026** server releases (production build 1861). Method signatures don't change.
