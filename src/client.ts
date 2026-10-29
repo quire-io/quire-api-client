@@ -938,8 +938,10 @@ export class QuireClient {
       assignees?: string[];
       // Task followers (OID, ID, or email). Special values: `"me"` (current
       // user), `"inherit"` (the parent task's followers), and `"app"` (with
-      // the `app|team` / `app|team|channel` / `app|/path` syntaxes). The
-      // current user is added automatically regardless.
+      // the `app|team` / `app|team|channel` / `app|/path` syntaxes). Only
+      // these users, plus anyone @mentioned in `description`, follow the
+      // new task; since Oct 29 2026 the current user isn't added, so pass
+      // `"me"` to follow it.
       followers?: string[];
       // Built-in Estimate field. Wire name is `etc` (non-negative integer
       // seconds). NOT a custom field — Quire 400s if sent under `customFields`.
@@ -975,8 +977,10 @@ export class QuireClient {
       assignees?: string[];
       // Task followers (OID, ID, or email). Special values: `"me"` (current
       // user), `"inherit"` (the parent task's followers), and `"app"` (with
-      // the `app|team` / `app|team|channel` / `app|/path` syntaxes). The
-      // current user is added automatically regardless.
+      // the `app|team` / `app|team|channel` / `app|/path` syntaxes). Only
+      // these users, plus anyone @mentioned in `description`, follow the
+      // new task; since Oct 29 2026 the current user isn't added, so pass
+      // `"me"` to follow it.
       followers?: string[];
       etc?: number;
       milestone?: boolean;
@@ -1010,8 +1014,10 @@ export class QuireClient {
       assignees?: string[];
       // Task followers (OID, ID, or email). Special values: `"me"` (current
       // user), `"inherit"` (the parent task's followers), and `"app"` (with
-      // the `app|team` / `app|team|channel` / `app|/path` syntaxes). The
-      // current user is added automatically regardless.
+      // the `app|team` / `app|team|channel` / `app|/path` syntaxes). Only
+      // these users, plus anyone @mentioned in `description`, follow the
+      // new task; since Oct 29 2026 the current user isn't added, so pass
+      // `"me"` to follow it.
       followers?: string[];
       etc?: number;
       milestone?: boolean;
@@ -1649,6 +1655,12 @@ export class QuireClient {
     body: {
       name: string;
       description?: string;
+      start?: string;
+      due?: string;
+      // Task OIDs to put in the new sublist; each brings all its
+      // descendants along. Change membership later with
+      // updateSublistMembership.
+      includes?: string[];
       // Who can see this record (Sep 21 2026). Omit or pass null for every
       // member of the owner; `[]` for the owner's admins only; a list of
       // users (OID, ID, email, or `"me"`) for just those. Every listed user
@@ -1920,6 +1932,8 @@ export class QuireClient {
       description?: string;
       // Jun 4 2026 — only valid when the owner is a project; other owner
       // types return 400. Same value grammar as createChat's `followers`.
+      // Only these users, plus anyone @mentioned in `description`, follow
+      // the new doc; pass `"me"` to follow it (Oct 29 2026).
       followers?: string[];
       // Who can see this record (Sep 21 2026). Omit or pass null for every
       // member of the owner; `[]` for the owner's admins only; a list of
@@ -1996,8 +2010,9 @@ export class QuireClient {
       description?: string;
       partner?: string;
       // Jun 4 2026 — user OID, ID, or email; also `"me"` / `"app"` (with the
-      // `app|team` / `app|/path` syntaxes). The current user is added
-      // automatically.
+      // `app|team` / `app|/path` syntaxes). Only these users follow the new
+      // chat; since Oct 29 2026 the current user isn't added, so pass `"me"`
+      // to follow it.
       followers?: string[];
       // Who can see this record (Sep 21 2026). Omit or pass null for every
       // member of the owner; `[]` for the owner's admins only; a list of

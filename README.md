@@ -239,7 +239,7 @@ await client.updateTask(taskOid, { followers: [aliceOid, "bob@example.com"] });
 
 Notes:
 
-- The creating user is added as a follower automatically by `createTask` — passing `followers` at creation adds to that, it doesn't replace it.
+- A new task, doc or chat is followed only by the users in its `followers`, plus, for a task or doc, anyone @mentioned in its description. Since the Oct 29 2026 server release the creating user is no longer added automatically — include `"me"` to keep following what you create.
 - Responses carry followers back as objects (`{ oid, id, name }[]`) on `QuireTask.followers`, `QuireProject.followers`, `QuireOrganization.followers`, `QuireChat.followers`, `QuireDocument.followers` — not as the string refs you sent.
 - Documents are followable only when **project-owned**; sending follower fields for other owner types returns `400`.
 - `searchTasks` has a separate read-side `follower` filter — see [Search filters](#search-filters).

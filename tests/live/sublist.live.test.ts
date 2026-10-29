@@ -1,6 +1,6 @@
 /**
  * Live API tests for /sublist (SL1-SL4, `members` SL5-SL8, `private`
- * SL9-SL11).
+ * SL9-SL11, `start` / `due` SL12, `includes` SL13).
  *
  * Membership note: adding/removing tasks goes through PUT /sublist/{oid}
  * with `{ changes: [{ task, exclude? }] }`, NOT /task/move (which only
@@ -230,6 +230,50 @@ describe.skipIf(!hasTokens)("Live API — /sublist", () => {
     expect(res.data?.message).toContain("private");
     if (res.status === 200 && res.data?.oid) {
       await client.deleteSublist(res.data.oid).catch(() => {});
+    }
+  });
+
+  // A sublist is the one work type with `start` / `due` (Oct 29 2026 doc
+  // fix). They come back as a timestamp at midnight UTC, so compare the
+  // date part only.
+  it("SL12 createSublist with start and due returns them", async () => {
+    const created = await client.createSublist("project", PROJECT_OID, {
+      name: `${runTag}-sublist-dates`,
+      start: "2027-01-04",
+      due: "2027-01-29",
+    });
+    try {
+      const read = await client.getSublist(created.oid);
+      expect(read.start?.slice(0, 10)).toBe("2027-01-04");
+      expect(read.due?.slice(0, 10)).toBe("2027-01-29");
+    } finally {
+      await client.deleteSublist(created.oid).catch(() => {});
+    }
+  });
+
+  // `includes` brings each listed task's descendants along, so the subtask
+  // is in without being listed.
+  it("SL13 createSublist with includes holds those tasks and their subtasks", async () => {
+    const parent = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-sl-includes`,
+    });
+    const child = await client.createSubtask(parent.oid, {
+      name: `${runTag}-sl-includes-child`,
+    });
+    let created: QuireSublist | undefined;
+    try {
+      created = await client.createSublist("project", PROJECT_OID, {
+        name: `${runTag}-sublist-includes`,
+        includes: [parent.oid],
+      });
+      const hits = await client.searchTasks(PROJECT_OID, {
+        sublist: created.oid,
+      });
+      expect(hits.some((x) => x.oid === parent.oid)).toBe(true);
+      expect(hits.some((x) => x.oid === child.oid)).toBe(true);
+    } finally {
+      if (created) await client.deleteSublist(created.oid).catch(() => {});
+      await client.deleteTask(parent.oid).catch(() => {});
     }
   });
 });

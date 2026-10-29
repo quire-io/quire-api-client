@@ -268,8 +268,22 @@ describe.skipIf(!hasTokens)("Quire API — /task", () => {
 
   // Task followers. Same value grammar as the project / org / chat / doc
   // follower fields, plus the task-only `"inherit"` (parent's followers).
-  // Quire adds the creator as a follower automatically, so TF2 removes
-  // first and re-adds — the reverse order would assert nothing.
+  // Since Oct 29 2026 Quire no longer adds the creator by itself (TF0); TF1
+  // passes `"me"`, so TF2 removes first and re-adds — the reverse order
+  // would assert nothing.
+  it("TF0 createTask without followers leaves the caller out", async () => {
+    const created = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-no-followers`,
+    });
+    try {
+      expect(
+        (created.followers ?? []).some((f) => f.oid === me.oid),
+      ).toBe(false);
+    } finally {
+      await client.deleteTask(created.oid).catch(() => {});
+    }
+  });
+
   it("TF1 createTask with followers accepts the `me` alias", async () => {
     followerTask = await client.createTask(PROJECT_OID, {
       name: `${runTag}-followers`,
