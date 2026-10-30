@@ -17,6 +17,9 @@
  *   - 403 with `code: 471` → the account is temporarily blocked.
  *   - 429 → the per-minute / per-hour API rate limit, and only that. Always
  *     carries `Retry-After`.
+ *   - 409 / 408 → JSON whose `code` echoes the status since Oct 30 2026
+ *     (it was 400 / 500). 409 is a value in use, such as a status value
+ *     or an approval category's id.
  *   - 401 / 403 / 404 → a full HTML error page
  *
  * Pre-Sep-21 servers returned 469 as a bare status, and wrapped quota in

@@ -22,6 +22,7 @@ import type {
   QuireCompactRef,
   QuireFieldAccess,
   QuireFieldDefinition,
+  QuireFieldOptionUpdate,
   QuireInsight,
   QuireOrganization,
   QuirePartner,
@@ -98,13 +99,20 @@ export interface QuireTaskSearchParams {
   text?: string;
   name?: string;
   description?: string;
-  /** "completed" | "active" | numeric 0–100. */
+  /**
+   * "completed" | "active" | one status value 0–100, where 100 matches every
+   * completed status, like "completed". Anything else is 400.
+   */
   status?: string | number;
   scheduled?: boolean;
   mine?: boolean;
   /** Interval like "7d" / "3h" / "30m" (default 7d); `false` to skip. */
   modified?: string | boolean;
   commented?: string | boolean;
+  /**
+   * A key of `sourceRef`: matches the tasks whose `sourceRef` has it,
+   * whatever its value. Sent as `?source-ref=`.
+   */
   sourceRef?: string;
   /** Integer or "no" for unlimited. Free-plan max is 30. */
   limit?: number | string;
@@ -169,7 +177,7 @@ export interface QuireTaskSearchParams {
   priority?: string | number;
   /** normal | task | section | milestone (alias `task` = `normal`). */
   type?: string;
-  /** User OID, id, or email. */
+  /** User OID, id, or email. Sent as `?created-by=`. */
   createdBy?: string;
   /** `true` (only recurring) / `false` (only non-recurring). */
   recurring?: boolean | string;
@@ -207,6 +215,14 @@ export type QuireMyTasksFilter = Omit<
   "mine" | "assignee" | "assignor" | "follower" | "createdBy"
 >;
 
+// The search parameters whose wire name differs from the property name.
+// The API doc gives the hyphenated names since Oct 30 2026; the server still
+// takes the camelCase ones.
+const SEARCH_PARAM_NAMES: ReadonlyMap<string, string> = new Map([
+  ["createdBy", "created-by"],
+  ["sourceRef", "source-ref"],
+]);
+
 function toSearchQueryString(params: QuireTaskSearchParams): string {
   const parts: string[] = [];
   const push = (k: string, v: unknown): void => {
@@ -224,7 +240,7 @@ function toSearchQueryString(params: QuireTaskSearchParams): string {
       }
       continue;
     }
-    push(k, v);
+    push(SEARCH_PARAM_NAMES.get(k) ?? k, v);
   }
   return parts.length > 0 ? `?${parts.join("&")}` : "";
 }
@@ -267,7 +283,9 @@ export interface QuireTaskListOptions {
   /**
    * `"active"` or `"completed"`, or one status value (0..100). Omit for
    * every task. Applied before paging, so a page still holds `limit` tasks
-   * while that many match.
+   * while that many match. 100 matches every completed status, like
+   * `"completed"`. Since Oct 30 2026 a value outside 0..100 is 400; before,
+   * 101 matched only that status and -1 matched nothing.
    */
   status?: "active" | "completed" | number;
   /** Page size, 1..1000, or `"no"` for every task in one array. */
@@ -282,6 +300,23 @@ function listPagingQuery(options: QuireTaskListOptions): string {
   if (options.limit !== undefined) parts.push(`limit=${options.limit}`);
   if (options.cursor !== undefined)
     parts.push(`cursor=${encodeURIComponent(options.cursor)}`);
+  return parts.length > 0 ? `?${parts.join("&")}` : "";
+}
+
+export interface QuireExportOptions {
+  /** Export only the active or the completed tasks. Omitted, `"all"`. */
+  status?: "active" | "completed" | "all";
+}
+
+export interface QuireExportCsvOptions extends QuireExportOptions {
+  /** Merge the values of a repeated header, such as every tag, into one column. Default false. */
+  merge?: boolean;
+}
+
+function exportQuery(options: QuireExportCsvOptions): string {
+  const parts: string[] = [];
+  if (options.status !== undefined) parts.push(`status=${options.status}`);
+  if (options.merge !== undefined) parts.push(`merge=${options.merge}`);
   return parts.length > 0 ? `?${parts.join("&")}` : "";
 }
 
@@ -564,6 +599,10 @@ export class QuireClient {
   // date. Response now includes `start`, `due`, `archivedAt`, `publicAt`,
   // and the `fields` custom-field map. See P7, P10, P11, P12 in
   // tests/quire_api/project.test.ts.
+  //
+  // Since Oct 30 2026: `start` / `due` take a project admin, and a date
+  // only — a time of day is 400, where it was stored. `public: true` on a
+  // plan without public projects is 402 with body `code` 469.
   async updateProject(
     projectOid: string,
     body: {
@@ -573,7 +612,10 @@ export class QuireClient {
       due?: string | null;
       archived?: boolean;
       public?: boolean;
-      // Replaces the whole follower list; the delta forms edit in place.
+      // Replaces the whole follower list, so it takes edit access even as
+      // `["me"]`; the delta forms edit in place. With read access only,
+      // they may name only yourself (`"me"`, or `"app"` for the app on
+      // your behalf): anyone else is 403, even along with yourself.
       followers?: string[];
       addFollowers?: string[];
       removeFollowers?: string[];
@@ -592,25 +634,46 @@ export class QuireClient {
   // to write it to disk or parse. The export endpoints don't share the
   // structured-object response shape every other endpoint has (CSV is text,
   // JSON is a file payload), so they bypass the JSON parser via fetchText.
+  //
+  // `status` exports only the active or completed tasks (default `all`);
+  // CSV's `merge` puts the values of a repeated header, such as every tag,
+  // in one column. Professional plan and above: a lower plan is 402 with
+  // body `code` 469, which since Oct 30 2026 costs 1 unit, not an export's.
   // -----------------------------------------------------------------------
 
-  async exportProjectCsv(projectOid: string): Promise<string> {
-    return this.fetchText(`/project/export-csv/${projectOid}`);
-  }
-
-  async exportProjectCsvById(projectId: string): Promise<string> {
+  async exportProjectCsv(
+    projectOid: string,
+    options: QuireExportCsvOptions = {},
+  ): Promise<string> {
     return this.fetchText(
-      `/project/export-csv/id/${encodeURIComponent(projectId)}`,
+      `/project/export-csv/${projectOid}${exportQuery(options)}`,
     );
   }
 
-  async exportProjectJson(projectOid: string): Promise<string> {
-    return this.fetchText(`/project/export-json/${projectOid}`);
+  async exportProjectCsvById(
+    projectId: string,
+    options: QuireExportCsvOptions = {},
+  ): Promise<string> {
+    return this.fetchText(
+      `/project/export-csv/id/${encodeURIComponent(projectId)}${exportQuery(options)}`,
+    );
   }
 
-  async exportProjectJsonById(projectId: string): Promise<string> {
+  async exportProjectJson(
+    projectOid: string,
+    options: QuireExportOptions = {},
+  ): Promise<string> {
     return this.fetchText(
-      `/project/export-json/id/${encodeURIComponent(projectId)}`,
+      `/project/export-json/${projectOid}${exportQuery(options)}`,
+    );
+  }
+
+  async exportProjectJsonById(
+    projectId: string,
+    options: QuireExportOptions = {},
+  ): Promise<string> {
+    return this.fetchText(
+      `/project/export-json/id/${encodeURIComponent(projectId)}${exportQuery(options)}`,
     );
   }
 
@@ -645,10 +708,24 @@ export class QuireClient {
 
   // Omitted body keys preserve their current value server-side per the
   // changelog. Caller should send only the keys they want to change.
+  //
+  // A select field's `options` replaces the whole set (Oct 30 2026):
+  //   - `from` renames that current option to `name`, and the tasks set to
+  //     it keep their value under the new name. Without `from` nothing is
+  //     taken as a rename: a current option no entry names, in `name` or
+  //     `from`, is removed, and its tasks lose the value.
+  //   - An entry without `color` keeps the color of the option it matches.
+  //   - `[]` removes every option, as `conditionFormat: []` removes every
+  //     rule; both used to be ignored.
+  //   - An unknown `from`, two entries matching one option, or a duplicate
+  //     name is 400.
   async updateProjectField(
     projectOid: string,
     fieldName: string,
-    body: QuireFieldAccess & Record<string, unknown>,
+    body: QuireFieldAccess & {
+      options?: QuireFieldOptionUpdate[];
+      conditionFormat?: unknown[];
+    } & Record<string, unknown>,
   ): Promise<QuireFieldDefinition> {
     return this.fetch<QuireFieldDefinition>(
       `/project/update-field/${projectOid}${fieldNameQuery(fieldName)}`,
@@ -699,6 +776,8 @@ export class QuireClient {
   // omitted when the roster is "anyone" (internal null).
   // -----------------------------------------------------------------------
 
+  // An `id` already in use is 409 since Oct 30 2026; it was 200 with the
+  // existing category, unchanged.
   async addProjectApprovalCategory(
     projectOid: string,
     body: {
@@ -952,6 +1031,18 @@ export class QuireClient {
       section?: boolean;
       // Recurrence spec — see docs/quire-recurring.md for the wire shape.
       recurrence?: QuireRecurrence;
+      // The external team to share the task with: the name or OID of one of
+      // the project's external teams. Its members then get the task and its
+      // subtasks. Takes the right to assign tasks (403); a value matching
+      // none of the project's teams is 400 (Oct 30 2026).
+      partner?: string;
+      // A JSON object the app stores with the task and reads back as is.
+      // `text` (a Markdown string) is shown as the task's source line; put
+      // the app's own data under a key named after the app, e.g.
+      // `{ text: "Source: [issue 42](…)", github: { repo, issue } }`, and
+      // find those tasks with searchTasks' `sourceRef: "github"`. At most
+      // about 2,048 characters in all; 400 otherwise.
+      sourceRef?: Record<string, unknown>;
       // Custom-field values (Apr 24 2026 confirmed by TC1). Flattened into
       // top-level body keys by flattenCustomFields — same shape as updateTask.
       customFields?: Record<string, unknown>;
@@ -986,6 +1077,9 @@ export class QuireClient {
       milestone?: boolean;
       section?: boolean;
       recurrence?: QuireRecurrence;
+      // See createTask.
+      partner?: string;
+      sourceRef?: Record<string, unknown>;
       customFields?: Record<string, unknown>;
     },
     options?: { compact?: Compact },
@@ -1023,6 +1117,9 @@ export class QuireClient {
       milestone?: boolean;
       section?: boolean;
       recurrence?: QuireRecurrence;
+      // See createTask.
+      partner?: string;
+      sourceRef?: Record<string, unknown>;
       customFields?: Record<string, unknown>;
     },
     position: "before" | "after",
@@ -1067,6 +1164,12 @@ export class QuireClient {
       // `app|team|channel` / `app|/path` syntaxes), and `"inherit"` — which
       // on add pulls in the parent task's followers and on remove drops the
       // ones inherited from the parent.
+      //
+      // With read access only, the deltas may name only yourself (`"me"`,
+      // or `"app"` for the app on your behalf): anyone else is 403, even
+      // along with yourself, and `followers` takes edit access even as
+      // `["me"]` (Oct 30 2026). Only following or unfollowing doesn't
+      // change `editedAt`.
       addFollowers?: string[];
       removeFollowers?: string[];
       // Task dependencies. The source task's `successors` list is the only
@@ -1077,8 +1180,9 @@ export class QuireClient {
       // tests/quire_api/task.test.ts.
       addSuccessors?: string[];
       removeSuccessors?: string[];
-      // Built-in Estimate field — see createTask.
-      etc?: number;
+      // Built-in Estimate field — see createTask. null clears it (Oct 30
+      // 2026; it was 400).
+      etc?: number | null;
       // Task-type flags. `section: true` wipes assignees/tags/start/due/
       // priority/etc as a side effect (stateless type); `milestone: true`
       // wipes `start` only. Converting back does NOT restore cleared
@@ -1096,6 +1200,12 @@ export class QuireClient {
       // does NOT merge), pass `null` to clear an existing recurrence. See
       // docs/quire-recurring.md and TR8 / TR9 in tests/quire_api/task.test.ts.
       recurrence?: QuireRecurrence | null;
+      // See createTask. The API can't take a task off its team: null is 400.
+      partner?: string;
+      // See createTask. Replaces the stored object as a whole, so keys left
+      // out are removed — another app's included; read the task first to
+      // keep them. null removes it.
+      sourceRef?: Record<string, unknown> | null;
       // Custom-field values keyed by display name. flattenCustomFields
       // rewrites this into top-level body keys before send — that's Quire's
       // wire format. See https://quire.io/dev/api/ → Update task.
@@ -1151,6 +1261,10 @@ export class QuireClient {
   // `before` / `after` make the transferred task a sibling of `task=`
   // (under its parent in the target project). See TMP4 in
   // tests/quire_api/task.test.ts.
+  //
+  // Since Oct 30 2026, going over the target's task or storage limit, or
+  // bringing reminders into a plan without them, is 402 with body `code`
+  // 469, where it was 400; a caller who can't move the task gets 403 first.
   async transferTask<const Compact extends boolean = false>(
     taskOid: string,
     params: {
@@ -1398,6 +1512,11 @@ export class QuireClient {
   // task's full timelogs array (empty when no logs remain). See TL1–TL5
   // in tests/quire_api/task.test.ts.
   //
+  // Since Oct 30 2026 a caller who can't see the project's time logs (a
+  // guest, when the project hides them) gets `[]` back, as GET /task gives
+  // them none; it used to be everyone's logs. A caller without permission
+  // gets 403 before a 404 or 409 could tell whether a log exists.
+  //
   // The wire form is `add-timelog` / `update-timelog` / `remove-timelog`
   // (with the `-timelog` suffix), not `add_timelog`. We expose the
   // by-OID URL form here; the by-id form is documented in the API but
@@ -1519,8 +1638,8 @@ export class QuireClient {
 
   // Undo-remove is idempotent and restores the previously-deleted task
   // (including subtasks — verified by T17c in tests/quire_api/task.test.ts).
-  // Counts against the per-plan task creation quota, so the caller can
-  // still surface a 469 to the user on a quota-exceeded restore.
+  // Counts against the per-plan task limit: beyond it, 402 with body `code`
+  // 469 since Oct 30 2026, where it was 200 with the task still removed.
   async undoRemoveTask(taskOid: string): Promise<QuireTask> {
     return this.fetch<QuireTask>(`/task/undo-remove/${taskOid}`, {
       method: "PUT",
@@ -1655,12 +1774,17 @@ export class QuireClient {
     body: {
       name: string;
       description?: string;
+      // Dates only, e.g. `2026-11-02`; a time of day is 400.
       start?: string;
       due?: string;
       // Task OIDs to put in the new sublist; each brings all its
       // descendants along. Change membership later with
       // updateSublistMembership.
       includes?: string[];
+      // `true` puts every task of the owner in the sublist; leave tasks out
+      // afterwards with updateSublistMembership's `exclude`. Default false:
+      // only the `includes`. Can't be changed after creation.
+      all?: boolean;
       // Who can see this record (Sep 21 2026). Omit or pass null for every
       // member of the owner; `[]` for the owner's admins only; a list of
       // users (OID, ID, email, or `"me"`) for just those. Every listed user
@@ -1687,6 +1811,7 @@ export class QuireClient {
     body: {
       name?: string;
       description?: string;
+      // Dates only, e.g. `2026-11-02`; a time of day is 400.
       start?: string;
       due?: string;
       archived?: boolean;
@@ -1714,14 +1839,18 @@ export class QuireClient {
   }
 
   // Add or remove tasks from a sublist. Each change is
-  // `{ task, exclude? }`: omitting `exclude` (or `false`) adds the task;
-  // `exclude: true` removes it. This is the only path for sublist
+  // `{ task, exclude?, single? }`, applied in order: omitting `exclude` (or
+  // `false`) adds the task; `exclude: true` removes it. By default the
+  // task's descendants follow it, and earlier changes to them are cleared;
+  // `single: true` changes the task alone. A task that doesn't exist, isn't
+  // under the sublist's owner, or isn't shared with the sublist's external
+  // team is skipped. This is the only path for sublist
   // membership — `/task/move` only reparents within the task tree and
   // returns a generic 400 when handed a sublist OID. See:
   //   boeneo/server/lib/src/api/sublist_api.dart
   async updateSublistMembership(
     sublistOid: string,
-    changes: { task: string; exclude?: boolean }[],
+    changes: { task: string; exclude?: boolean; single?: boolean }[],
   ): Promise<QuireSublist> {
     return this.fetch<QuireSublist>(`/sublist/${sublistOid}`, {
       method: "PUT",
@@ -1777,9 +1906,17 @@ export class QuireClient {
     }) as Promise<Compact extends true ? QuireCompactRef : QuireComment>;
   }
 
+  // `asUser: true` records the app, not the authorizing user, as the one
+  // who made the change: `editedBy` when `description` changes, `pinBy`
+  // when the comment is pinned.
   async updateComment<const Compact extends boolean = false>(
     commentOid: string,
-    body: { description?: string; pinned?: boolean; compact?: Compact },
+    body: {
+      description?: string;
+      pinned?: boolean;
+      asUser?: boolean;
+      compact?: Compact;
+    },
   ): Promise<Compact extends true ? QuireCompactRef : QuireComment> {
     const { compact, ...wire } = body;
     const qs = compact ? "?return=compact" : "";
@@ -1857,6 +1994,10 @@ export class QuireClient {
     return this.fetch<QuireStatus>(path);
   }
 
+  // A `value` already in use is 409 since Oct 30 2026, on create and on
+  // update: create used to be 400, and update 200 with nothing changed.
+  // The value of `0` (the initial status) and `100` (completed) can't
+  // change.
   async createStatus(
     projectIdOrOid: string,
     body: { name: string; color: string; value: number },
@@ -1969,6 +2110,7 @@ export class QuireClient {
       private?: boolean;
       // Jun 4 2026 — only valid on project-owned documents (400 otherwise).
       // `followers` replaces the whole list; the delta forms add/remove.
+      // Same read-access rule as updateTask's (Oct 30 2026).
       followers?: string[];
       addFollowers?: string[];
       removeFollowers?: string[];
@@ -2056,7 +2198,8 @@ export class QuireClient {
       // set it is always hidden, so `false` is `400` and `true` a no-op.
       private?: boolean;
       // `followers` replaces the whole list (Jun 4 2026); the delta forms
-      // add/remove without touching the rest.
+      // add/remove without touching the rest. Same read-access rule as
+      // updateTask's (Oct 30 2026).
       followers?: string[];
       addFollowers?: string[];
       removeFollowers?: string[];
@@ -2375,6 +2518,10 @@ export class QuireClient {
   // minimum 1) — over-budget calls return 429 with no partial delivery.
   // Requires the `share` scope (`arNotification` server-side); calls
   // without it return 403. No response body.
+  //
+  // `url`: a `javascript:` URL is 400 (Oct 30 2026). Without a scheme, such
+  // as `example.com/sync`, `https://` is assumed; a path starting with `/`
+  // points into Quire.
   // -----------------------------------------------------------------------
 
   async sendNotification(body: {
@@ -2404,6 +2551,11 @@ export class QuireClient {
   //     `leads` alone; `when` / `recurrence` are rejected with 400 because
   //     they would be ignored.
   //   - no task, or a task with neither date → `when` is required.
+  //
+  // A task the caller can't see (an external-team member's view of a task
+  // not shared with their team) is 404 on create and list, the same as a
+  // missing task (Oct 30 2026); it used to be created or listed, with the
+  // task's name.
   //
   // Delete is permanent: a reminder is not moved to the trash and cannot be
   // restored, so there is no undoRemoveReminder.
@@ -2556,8 +2708,12 @@ export interface QuireCreateReminderBody {
   name?: string;
   /**
    * OID of an external team to share this reminder with. Project reminders
-   * only; on a task reminder it must be that task's own team. Cannot be
-   * combined with `members`.
+   * only: one of the project's external teams, or on a task reminder the
+   * team the task is shared with (its own `partner`, or its nearest
+   * parent's); anything else is 400, where an unknown team used to be
+   * dropped and the reminder sent to every member (Oct 30 2026). Cannot be
+   * combined with `members`. An external-team member sharing with every
+   * member must set it to one of their own teams.
    */
   partner?: string;
   /**
@@ -2565,8 +2721,10 @@ export interface QuireCreateReminderBody {
    * null for every member of the owner; `[]` for the owner's admins only; a
    * list of users (OID, ID, email, or `"me"`) for just those. A non-empty
    * list must include you, and every entry must be a member of the owner —
-   * otherwise 400. A personal reminder (owner `-`) is always yours alone,
-   * so nobody else can be named.
+   * otherwise 400. On a task reminder, every listed user must also see the
+   * task — an external-team member sees only the tasks shared with their
+   * team — or it is 400 naming them (Oct 30 2026). A personal reminder
+   * (owner `-`) is always yours alone, so nobody else can be named.
    */
   members?: string[];
 }

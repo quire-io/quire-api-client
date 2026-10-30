@@ -39,10 +39,10 @@ Generated from 129 client methods covering 135 endpoints across 25 sections.
 
 | Method | HTTP | Endpoint |
 |---|---|---|
-| `exportProjectCsv` | `GET` | `/api/project/export-csv/{projectOid}` |
-| `exportProjectCsvById` | `GET` | `/api/project/export-csv/id/{projectId}` |
-| `exportProjectJson` | `GET` | `/api/project/export-json/{projectOid}` |
-| `exportProjectJsonById` | `GET` | `/api/project/export-json/id/{projectId}` |
+| `exportProjectCsv` | `GET` | `/api/project/export-csv/{projectOid}[?…]` |
+| `exportProjectCsvById` | `GET` | `/api/project/export-csv/id/{projectId}[?…]` |
+| `exportProjectJson` | `GET` | `/api/project/export-json/{projectOid}[?…]` |
+| `exportProjectJsonById` | `GET` | `/api/project/export-json/id/{projectId}[?…]` |
 
 ## Project custom-field definitions — Apr 22 2026
 

@@ -10,6 +10,8 @@ export type {
 } from "./client.js";
 export type {
   QuireCreateReminderBody,
+  QuireExportCsvOptions,
+  QuireExportOptions,
   QuireMyTasksFilter,
   QuireMyTasksScope,
   QuireReminderListOptions,
@@ -64,6 +66,7 @@ export type {
   QuireEnumValue,
   QuireFieldAccess,
   QuireFieldDefinition,
+  QuireFieldOptionUpdate,
   QuireInsight,
   QuireInsightOwnerType,
   QuireOrganization,

@@ -1,5 +1,5 @@
 /**
- * Live API tests for task recurrence (TR1-TR9).
+ * Live API tests for task recurrence (TR1-TR10).
  *
  *   POST /task/{projectOid}   body.recurrence = { freq, interval, ... }
  *   PUT  /task/{taskOid}      body.recurrence = { ... } | null
@@ -160,5 +160,13 @@ describe.skipIf(!hasTokens)("Live API — task recurrence", () => {
     const got = await client.getTask(created.oid);
     expect(got.recurrence?.interval).toBe(2);
     expect(got.recurrence?.byweekday).toEqual([0]);
+  });
+
+  // Oct 30 2026: `interval` defaults to 1 and `sincelatest` to false, as
+  // the API doc says; leaving either out was 400.
+  it("TR10 daily without interval or sincelatest defaults to every day", async () => {
+    const created = await createWithRecurrence("tr10", { freq: "daily" });
+    expect(created.recurrence?.interval).toBe(1);
+    expect(created.recurrence?.sincelatest ?? false).toBe(false);
   });
 });

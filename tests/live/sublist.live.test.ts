@@ -1,6 +1,6 @@
 /**
  * Live API tests for /sublist (SL1-SL4, `members` SL5-SL8, `private`
- * SL9-SL11, `start` / `due` SL12, `includes` SL13).
+ * SL9-SL11, `start` / `due` SL12, `includes` SL13, `all` / `single` SL14).
  *
  * Membership note: adding/removing tasks goes through PUT /sublist/{oid}
  * with `{ changes: [{ task, exclude? }] }`, NOT /task/move (which only
@@ -234,8 +234,8 @@ describe.skipIf(!hasTokens)("Live API — /sublist", () => {
   });
 
   // A sublist is the one work type with `start` / `due` (Oct 29 2026 doc
-  // fix). They come back as a timestamp at midnight UTC, so compare the
-  // date part only.
+  // fix). Dates only since Oct 30 2026: `yyyy-MM-dd` comes back, where it
+  // was a timestamp at midnight UTC, and a time of day is 400.
   it("SL12 createSublist with start and due returns them", async () => {
     const created = await client.createSublist("project", PROJECT_OID, {
       name: `${runTag}-sublist-dates`,
@@ -244,8 +244,11 @@ describe.skipIf(!hasTokens)("Live API — /sublist", () => {
     });
     try {
       const read = await client.getSublist(created.oid);
-      expect(read.start?.slice(0, 10)).toBe("2027-01-04");
-      expect(read.due?.slice(0, 10)).toBe("2027-01-29");
+      expect(read.start).toBe("2027-01-04");
+      expect(read.due).toBe("2027-01-29");
+      await expect(
+        client.updateSublist(created.oid, { due: "2027-01-29T17:00:00Z" }),
+      ).rejects.toThrow(/Quire API error 400/);
     } finally {
       await client.deleteSublist(created.oid).catch(() => {});
     }
@@ -271,6 +274,44 @@ describe.skipIf(!hasTokens)("Live API — /sublist", () => {
       });
       expect(hits.some((x) => x.oid === parent.oid)).toBe(true);
       expect(hits.some((x) => x.oid === child.oid)).toBe(true);
+    } finally {
+      if (created) await client.deleteSublist(created.oid).catch(() => {});
+      await client.deleteTask(parent.oid).catch(() => {});
+    }
+  });
+
+  // `all: true` holds every task of the owner; excluding a task with
+  // `single: true` leaves its subtask in.
+  it("SL14 createSublist with all holds every task; single excludes the task alone", async () => {
+    const parent = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-sl-all`,
+    });
+    const child = await client.createSubtask(parent.oid, {
+      name: `${runTag}-sl-all-child`,
+    });
+    let created: QuireSublist | undefined;
+    try {
+      created = await client.createSublist("project", PROJECT_OID, {
+        name: `${runTag}-sublist-all`,
+        all: true,
+      });
+      expect(created.all).toBe(true);
+      const before = await client.searchTasks(PROJECT_OID, {
+        sublist: created.oid,
+        text: `${runTag}-sl-all`,
+      });
+      expect(before.some((x) => x.oid === parent.oid)).toBe(true);
+      expect(before.some((x) => x.oid === child.oid)).toBe(true);
+
+      await client.updateSublistMembership(created.oid, [
+        { task: parent.oid, exclude: true, single: true },
+      ]);
+      const after = await client.searchTasks(PROJECT_OID, {
+        sublist: created.oid,
+        text: `${runTag}-sl-all`,
+      });
+      expect(after.some((x) => x.oid === parent.oid)).toBe(false);
+      expect(after.some((x) => x.oid === child.oid)).toBe(true);
     } finally {
       if (created) await client.deleteSublist(created.oid).catch(() => {});
       await client.deleteTask(parent.oid).catch(() => {});

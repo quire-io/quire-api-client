@@ -131,8 +131,13 @@ describe.skipIf(!hasTokens)("Live API — /project", () => {
         start: "2026-04-01",
         due: "2026-04-30",
       });
-      expect(set.start).toBeTruthy();
-      expect(set.due).toBeTruthy();
+      expect(set.start).toBe("2026-04-01");
+      expect(set.due).toBe("2026-04-30");
+      // Dates only since Oct 30 2026: a time of day is 400, where it was
+      // stored.
+      await expect(
+        client.updateProject(project!.oid, { due: "2026-04-30T17:00:00Z" }),
+      ).rejects.toThrow(/Quire API error 400/);
     } finally {
       await client.updateProject(project!.oid, {
         start: baseline.start ?? null,
@@ -340,8 +345,6 @@ describe.skipIf(!hasTokens)("Live API — /project/*-appv-cat (approval categori
   type CategoryWithRefs = QuireApprovalCategory & {
     claimerRefs?: { oid: string; id: string }[];
     approverRefs?: { oid: string; id: string }[];
-    createdBy?: string;
-    createdAt?: string;
   };
 
   afterAll(async () => {
@@ -362,7 +365,10 @@ describe.skipIf(!hasTokens)("Live API — /project/*-appv-cat (approval categori
     // null roster → "anyone" → server omits the key entirely.
     expect(res.claimers).toBeUndefined();
     expect(res.approvers).toBeUndefined();
-    expect(res.createdBy).toBeTruthy();
+    // A user object since Oct 30 2026; the creator's bare OID before.
+    const me = await client.getMe();
+    expect(res.createdBy?.oid).toBe(me.oid);
+    expect(res.createdBy?.id).toBe(me.id);
     expect(res.createdAt).toBeTruthy();
 
     // Use rawApi to read the project's approvalCategories — the wrapped
@@ -375,6 +381,17 @@ describe.skipIf(!hasTokens)("Live API — /project/*-appv-cat (approval categori
     const found = proj.data.approvalCategories!.find((c) => c.id === catId);
     expect(found).toBeDefined();
     expect(found!.name).toBe(catName);
+  });
+
+  // Oct 30 2026: an id in use is 409; it was 200 with the existing
+  // category, unchanged.
+  it("PAC1b addProjectApprovalCategory with an id in use is 409", async () => {
+    await expect(
+      client.addProjectApprovalCategory(PROJECT_OID, {
+        id: catId,
+        name: `${catName}-again`,
+      }),
+    ).rejects.toThrow(/Quire API error 409/);
   });
 
   it("PAC2 updateProjectApprovalCategory renames; rosters from PAC1 survive", async () => {

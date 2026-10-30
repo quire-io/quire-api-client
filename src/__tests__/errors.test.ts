@@ -77,6 +77,15 @@ describe("formatQuireError", () => {
     );
   });
 
+  // Since Oct 30 2026 a 409's body `code` is 409, where it was 400; either
+  // way the server's message comes through.
+  it("shows a 409's message, such as a status value in use", () => {
+    const body = JSON.stringify({ code: 409, message: "Status value 50 is already in use." });
+    expect(formatQuireError(409, body, "application/json")).toBe(
+      "Quire API error 409: Status value 50 is already in use.",
+    );
+  });
+
   it("falls through to the rate-limit message for a 429 without `code: 469`", () => {
     expect(formatQuireError(429, "", "text/html", "/task/oid_x", "30"))
       .toBe("Quire API error 429 (rate limited — retry after 30s)");

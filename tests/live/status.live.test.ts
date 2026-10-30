@@ -1,5 +1,5 @@
 /**
- * Live API tests for /status (S1-S8).
+ * Live API tests for /status (S1-S9).
  *
  * Status semantics:
  *   - value 0   = active (default; reserved)
@@ -139,6 +139,34 @@ describe.skipIf(!hasTokens)("Live API — /status", () => {
       if (created) {
         await client.deleteStatus(PROJECT_OID, idValue).catch(() => {});
       }
+    }
+  });
+
+  // Oct 30 2026: a value in use is 409 on create (it was 400) and on update
+  // (it was 200 with nothing changed). 0 is always in use.
+  it("S9 createStatus / updateStatus to a value in use is 409", async () => {
+    await expect(
+      client.createStatus(PROJECT_OID, {
+        name: `${runTag}-taken`,
+        color: "03",
+        value: 0,
+      }),
+    ).rejects.toThrow(/Quire API error 409/);
+
+    const value = 49;
+    await client.createStatus(PROJECT_OID, {
+      name: `${runTag}-to-move`,
+      color: "03",
+      value,
+    });
+    try {
+      await expect(
+        client.updateStatus(PROJECT_OID, value, { value: 0 }),
+      ).rejects.toThrow(/Quire API error 409/);
+      const s = await client.getStatus(PROJECT_OID, value);
+      expect(s.name).toBe(`${runTag}-to-move`);
+    } finally {
+      await client.deleteStatus(PROJECT_OID, value).catch(() => {});
     }
   });
 });

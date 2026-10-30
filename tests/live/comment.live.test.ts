@@ -22,6 +22,7 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
   const COMMENT_TEXT = `${runTag}-comment`;
 
   let taskOid: string | undefined;
+  let taskId: number | undefined;
   let commentOid: string | undefined;
 
   beforeAll(async () => {
@@ -29,6 +30,7 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
       name: `${runTag}-comment-host`,
     });
     taskOid = t.oid;
+    taskId = t.id;
   });
 
   afterAll(async () => {
@@ -69,10 +71,15 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
     expect(comments.some((c) => c.oid === commentOid)).toBe(true);
   });
 
-  it("C3 getComment returns the single comment with owner.oid pointing back to the task", async () => {
+  // `ownerType`, an internal number, is gone since Oct 30 2026; `owner`
+  // tells the type and the task's ID.
+  it("C3 getComment returns the single comment with owner pointing back to the task", async () => {
     const c = await client.getComment(commentOid!);
     expect(c.oid).toBe(commentOid);
     expect(c.owner?.oid).toBe(taskOid);
+    expect(c.owner?.type).toBe("Task");
+    expect(c.owner?.id).toBe(taskId);
+    expect(c.ownerType).toBeUndefined();
   });
 
   it("C3a updateComment updates the description", async () => {
@@ -80,6 +87,19 @@ describe.skipIf(!hasTokens)("Live API — /comment on a task", () => {
       description: `${COMMENT_TEXT} edited`,
     });
     expect(c.descriptionText ?? c.description).toContain("edited");
+  });
+
+  // `asUser: true` on an update records the app as the editor (and as the
+  // one who pinned it), as it does for the author on addComment.
+  it("C3c updateComment with asUser records the app in editedBy and pinBy", async () => {
+    const c = await client.updateComment(commentOid!, {
+      description: `${COMMENT_TEXT} edited by the app`,
+      pinned: true,
+      asUser: true,
+    });
+    expect(c.editedBy?.id).toMatch(/^ap\|/);
+    expect(c.pinBy?.id).toMatch(/^ap\|/);
+    await client.updateComment(commentOid!, { pinned: false });
   });
 
   // ?return=compact on /comment endpoints. Comments don't carry a numeric

@@ -115,6 +115,7 @@ export interface QuireProject {
   descriptionHtml?: string;
   email?: string;
   website?: string;
+  // Dates only, `yyyy-MM-dd` (Oct 30 2026); omitted when not set.
   start?: string;
   due?: string;
   archivedAt?: string;
@@ -185,6 +186,16 @@ export interface QuireFieldAccess {
   locked?: boolean;
 }
 
+// One entry of a select field's `options` on update-field (Oct 30 2026). An
+// object, not a plain string. `from` names the current option this entry
+// renames to `name`; without it the entry is the current option of that
+// `name`, or a new one. Leave out `color` to keep the matched option's.
+export interface QuireFieldOptionUpdate {
+  name: string;
+  color?: string;
+  from?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Approval — project-level categories + task-level state (Apr 24 2026).
 //
@@ -221,7 +232,8 @@ export interface QuireApprovalCategory {
   claimerRefs?: { oid: string; id: string }[];
   /** {oid, id} companion to approvers (May 1 2026). Same tri-state semantics. */
   approverRefs?: { oid: string; id: string }[];
-  createdBy?: string;
+  /** A user object since Oct 30 2026, as every other `createdBy`; the creator's bare OID before. */
+  createdBy?: { oid: string; id: string; name: string };
   createdAt?: string;
   [key: string]: unknown;
 }
@@ -246,18 +258,19 @@ export interface QuireApproval {
 // Attachment — file attached to a task (or comment, eventually). Verified by
 // A1/A2 in tests/quire_api/attachment.test.ts.
 //
-// `url` form differs by source: POST /task/attach returns an absolute URL
-// (`https://quire.io/att/...`), but the same entry inside `attachments[]` on
-// GET /task/{oid} carries it relative (`/att/...`). Callers that want a
-// clickable link should prepend QUIRE_API_SERVER when the value starts with
-// `/`. Files are stored with `x-amz-acl: public-read` — the path segment is
+// `url` is absolute everywhere since Oct 30 2026: a file stored in Quire is
+// under `https://quire.io/att/`, one from an external storage links to that
+// service. That covers `attachments[]` on tasks, comments and projects, a
+// file custom field's value, and webhooks, which until then carried a Quire
+// file relative (`/att/...`); only POST /task/attach returned it absolute.
+// Files are stored with `x-amz-acl: public-read` — the path segment is
 // unguessable but the URL itself is not authenticated.
 // ---------------------------------------------------------------------------
 export interface QuireAttachment {
   name: string;
   url: string;
   length: number;
-  /** Type discriminator — observed value 2 for ordinary file uploads. */
+  /** Where it is stored: 1 Google Drive, 2 Quire storage, 3 OneDrive, 4 Dropbox, 5 Box. */
   type?: number;
   createdAt?: string;
   createdBy?: { oid: string; id: string; name: string };
@@ -274,10 +287,14 @@ export interface QuireAttachment {
 // mutually exclusive with byweekno. sincelatest is daily-only. until
 // (ISO date) is the only end condition Quire supports. seriesId is
 // server-assigned — omit on writes.
+//
+// Since Oct 30 2026 a write may leave out `interval` (default 1) and
+// `sincelatest` (default false), as the API doc says; they were 400. An
+// `interval` of 0 or less is 400, where it was taken as 1.
 // ---------------------------------------------------------------------------
 export interface QuireRecurrence {
   freq: "daily" | "weekly" | "monthly" | "yearly";
-  interval: number;
+  interval?: number;
   byweekday?: number | number[];
   byweekno?: number | "last";
   bydayno?: number;
@@ -316,12 +333,20 @@ export interface QuireTask {
   createdAt?: string;
   editedAt?: string;
   archivedAt?: string;
+  archivedBy?: { oid: string; id: string; name: string } | null;
   // Last comment timestamp. Bumped by /comment POSTs; drives the `commented`
   // search filter on /task/search*.
   commentedAt?: string;
-  // Free-form external identifier echoed by Quire (used with the `sourceRef`
-  // search filter). Write path is exposed on create_task / create_subtask.
-  sourceRef?: string;
+  // The JSON object an app stored with the task, as is; omitted if none. Its
+  // `text`, if any, is the Markdown Quire shows as the task's source line;
+  // other keys are the apps' own data, each under a key named after its app.
+  // Find tasks by one of those keys with the `sourceRef` search filter.
+  // Written by createTask / updateTask.
+  sourceRef?: Record<string, unknown>;
+  // The external team the task is shared with, and who shared it. Omitted
+  // when it isn't shared with one.
+  partner?: { oid: string; name: string; [key: string]: unknown };
+  partnerBy?: { oid: string; id: string; name: string } | null;
   // Peekaboo (archived) state. `reshowAt` is the auto-reshow timestamp (null
   // means "never auto-reshow"); `peekaboo` is a derived `true` set whenever
   // archivedAt is non-null. See tests/quire_api/task.test.ts TP1–TP3.
@@ -424,6 +449,8 @@ export interface QuireSublist {
   description?: string;
   descriptionText?: string;
   descriptionHtml?: string;
+  // Dates only, `yyyy-MM-dd` (Oct 30 2026); a timestamp at midnight UTC
+  // (`2026-11-02T00:00:00.000Z`) before.
   due?: string;
   start?: string;
   archivedAt?: string;
@@ -447,6 +474,10 @@ export interface QuireSublist {
   // external team, with selected members or with the admins only is always
   // hidden from them.
   private?: boolean;
+  // true: every task of the owner is in the sublist except the excluded
+  // ones; false: only the included ones. Either way a task brings its
+  // subtasks. Chosen at creation (createSublist's `all`).
+  all?: boolean;
   [key: string]: unknown;
 }
 
@@ -696,7 +727,17 @@ export interface QuireComment {
   attachments?: QuireAttachment[];
   pinAt?: string;
   pinBy?: { oid: string; id: string; name: string };
-  owner?: unknown;
+  // The task or chat channel it was posted on. `id` is a task's integer ID
+  // or a chat's string ID. The comment's own `ownerType`, an internal
+  // number, is gone since Oct 30 2026; read `owner.type` instead.
+  owner?: {
+    oid: string;
+    id: number | string;
+    type: "Task" | "Chat";
+    name?: string;
+    url?: string;
+    [key: string]: unknown;
+  };
   // A comment posted with `asUser: true` gives the app here: `id` is
   // `ap|<app ID>`, `name` the app's name and `oid` its agent OID (`ap|…`).
   createdBy?: { oid: string; id: string; name: string };
@@ -754,8 +795,9 @@ export interface QuireReminderLead {
 export interface QuireReminder {
   oid: string;
   // Null when the reminder stands on its own. Only these four fields come
-  // back — fetch the task itself for its dates.
-  task?: { oid: string; id: string; name: string; url?: string } | null;
+  // back — fetch the task itself for its dates. `id` is the task's integer
+  // ID, as on a task.
+  task?: { oid: string; id: number; name: string; url?: string } | null;
   // Null whenever `task` has a start or due date: the reminder then fires
   // from that date instead, and `leads` counts back from it.
   when?: string | null;

@@ -69,6 +69,9 @@ describe.skipIf(!hasTokens)("Live API — /task/attach", () => {
       (a) => a.name === FILE_NAME || a.filename === FILE_NAME,
     );
     expect(match).toBeTruthy();
+    // Absolute since Oct 30 2026; it was relative (`/att/...`) here, and
+    // absolute only on the attach response.
+    expect(match!.url).toMatch(/^https:\/\//);
   });
 });
 
@@ -125,5 +128,6 @@ describe.skipIf(!hasTokens)("Live API — /comment/attach", () => {
       (a) => a.name === FILE_NAME || a.filename === FILE_NAME,
     );
     expect(match).toBeTruthy();
+    expect(match!.url).toMatch(/^https:\/\//);
   });
 });

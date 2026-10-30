@@ -190,7 +190,7 @@ function renderSubstitution(expr) {
   // Helper functions that build query strings.
   if (ts.isCallExpression(e) && ts.isIdentifier(e.expression)) {
     const name = e.expression.text;
-    if (name === "toSearchQueryString") return "[?…]";
+    if (name === "toSearchQueryString" || name === "exportQuery") return "[?…]";
     if (name === "listPagingQuery") return "[?limit&cursor]";
     if (name === "fieldNameQuery") return renderFieldNameQuery(e);
   }

@@ -119,7 +119,9 @@ The logger interface is `{ error, info, debug?, warn? }` — any structural matc
 
 ## Search filters
 
-`searchTasks` (project), `searchTasksInOrganization`, and `searchTasksInFolder` all accept the same `QuireTaskSearchParams` shape. See the [interface in `src/client.ts`](src/client.ts#L90-L152) for the full field list and per-field JSDoc; this section covers the grammar shared across many fields.
+`searchTasks` (project), `searchTasksInOrganization`, and `searchTasksInFolder` all accept the same `QuireTaskSearchParams` shape. See the [interface in `src/client.ts`](src/client.ts#L98-L184) for the full field list and per-field JSDoc; this section covers the grammar shared across many fields.
+
+`createdBy` and `sourceRef` go out as `?created-by=` and `?source-ref=`, the names the API doc gives since Oct 30 2026. `sourceRef` takes a key of a task's `sourceRef` object and matches the tasks that have it, whatever its value.
 
 ### Boolean grammar (user / tag / priority / type / createdBy / recurring)
 
@@ -242,6 +244,7 @@ Notes:
 - A new task, doc or chat is followed only by the users in its `followers`, plus, for a task or doc, anyone @mentioned in its description. Since the Oct 29 2026 server release the creating user is no longer added automatically — include `"me"` to keep following what you create.
 - Responses carry followers back as objects (`{ oid, id, name }[]`) on `QuireTask.followers`, `QuireProject.followers`, `QuireOrganization.followers`, `QuireChat.followers`, `QuireDocument.followers` — not as the string refs you sent.
 - Documents are followable only when **project-owned**; sending follower fields for other owner types returns `400`.
+- With read access only, on a project, task, doc or chat, `addFollowers` / `removeFollowers` may name only yourself (`"me"`, or `"app"` for the app on your behalf); anyone else is `403`, even along with yourself. `followers` takes edit access even as `["me"]` (Oct 30 2026). An organization takes edit access for any follower change.
 - `searchTasks` has a separate read-side `follower` filter — see [Search filters](#search-filters).
 
 ## Record visibility (`members`, `private`)
@@ -387,11 +390,12 @@ Since the Sep 21 2026 server release the HTTP status carries the category and th
 
 | Status + body `code` | Meaning | What helps |
 |---|---|---|
-| `402` + `469` | Plan limit or quota (tasks, custom fields, dashboard, insight, sublist, chat, doc), or a bulk call / nested task create over the plan's per-call cap | Upgrading, or for an oversized batch, splitting it. Retrying as is never does. |
+| `402` + `469` | Plan limit or quota (tasks, custom fields, dashboard, insight, sublist, chat, doc, public projects, export), or a bulk call / nested task create over the plan's per-call cap | Upgrading, or for an oversized batch, splitting it. Retrying as is never does. |
 | `402` + `470` | Subscription **expired** | Resubscribing — no in-plan upgrade clears it |
 | `403` + `471` | Account temporarily blocked | Waiting, or contacting Quire |
 | `429` | The per-minute / per-hour API rate limit, and only this | Backing off; always carries `Retry-After` |
 | `400` + `400` | Validation (missing name, duplicate or reserved id) | Fixing the request |
+| `409` + `409` | A value in use: a status value, an approval category's id, a custom field's name (body `code` 400 before Oct 30 2026) | Picking another value |
 
 Before that release, plan limits and expired subscriptions both came back as `429`, which invited callers to back off and retry a condition that only upgrading could clear. The body-`code` checks are status-independent, so a client pointed at an older server still gets the right message.
 

@@ -266,6 +266,43 @@ describe.skipIf(!hasTokens)("Quire API — /task", () => {
     await client.deleteTask(created.oid);
   });
 
+  // Oct 30 2026: null clears the estimate; it was 400.
+  it("T13c updateTask with etc null clears Estimate", async () => {
+    await client.updateTask(task.oid, { etc: 3600 });
+    await client.updateTask(task.oid, { etc: null });
+    const got = await client.getTask(task.oid);
+    expect(got.etc).toBeUndefined();
+  });
+
+  // `sourceRef` is a JSON object kept as is; searchTasks' `sourceRef` (sent
+  // as `?source-ref=`) finds the tasks that have the given key.
+  it("T13d createTask stores sourceRef; search by its key finds it; null removes it", async () => {
+    const key = `livetest${Date.now()}`;
+    const sourceRef = { [key]: { issue: 42 } };
+    const created = await client.createTask(PROJECT_OID, {
+      name: `${runTag}-source-ref`,
+      sourceRef,
+    });
+    try {
+      expect((await client.getTask(created.oid)).sourceRef).toEqual(sourceRef);
+      const hits = await client.searchTasks(PROJECT_OID, { sourceRef: key });
+      expect(hits.map((t) => t.oid)).toEqual([created.oid]);
+
+      await client.updateTask(created.oid, { sourceRef: null });
+      expect((await client.getTask(created.oid)).sourceRef).toBeUndefined();
+    } finally {
+      await client.deleteTask(created.oid).catch(() => {});
+    }
+  });
+
+  // Oct 30 2026: a partner that isn't one of the project's external teams
+  // is 400 (on update it used to be ignored).
+  it("T13e updateTask with an unknown partner is 400", async () => {
+    await expect(
+      client.updateTask(task.oid, { partner: `${runTag}-no-such-team` }),
+    ).rejects.toThrow(/Quire API error 400/);
+  });
+
   // Task followers. Same value grammar as the project / org / chat / doc
   // follower fields, plus the task-only `"inherit"` (parent's followers).
   // Since Oct 29 2026 Quire no longer adds the creator by itself (TF0); TF1

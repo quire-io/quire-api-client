@@ -932,3 +932,123 @@ describe("custom-field names go in the query (Oct 23 2026)", () => {
     );
   });
 });
+
+describe("Oct 30 2026 server release", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn().mockImplementation(async () => jsonResponse({}));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mkClient(): QuireClient {
+    return new QuireClient({ tokens: mkTokens(), apiServer });
+  }
+
+  function lastCall(): [string, RequestInit] {
+    return fetchMock.mock.calls.at(-1)! as [string, RequestInit];
+  }
+
+  function lastBody(): unknown {
+    return JSON.parse(lastCall()[1].body as string);
+  }
+
+  it("search sends createdBy / sourceRef under their hyphenated names", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse([]));
+    const client = mkClient();
+
+    await client.searchTasks("oid-p1", {
+      createdBy: "alice|bob",
+      sourceRef: "github",
+      status: 100,
+      customFields: { sourceRef: "kept" },
+    });
+    expect(lastCall()[0]).toBe(
+      "https://quire.io/api/task/search/oid-p1?created-by=alice%7Cbob&source-ref=github&status=100&sourceRef=kept",
+    );
+
+    await client.searchTasksInOrganization("oid-o1", { sourceRef: "jira" });
+    expect(lastCall()[0]).toBe(
+      "https://quire.io/api/task/search-organization/oid-o1?source-ref=jira",
+    );
+  });
+
+  it("exports take status, and CSV merge", async () => {
+    fetchMock.mockImplementation(
+      async () => new Response("x", { status: 200, headers: { "content-type": "text/csv" } }),
+    );
+    const client = mkClient();
+
+    await client.exportProjectCsv("oid-p1", { status: "active", merge: true });
+    expect(lastCall()[0]).toBe(
+      "https://quire.io/api/project/export-csv/oid-p1?status=active&merge=true",
+    );
+    await client.exportProjectCsvById("my_proj", { merge: false });
+    expect(lastCall()[0]).toBe(
+      "https://quire.io/api/project/export-csv/id/my_proj?merge=false",
+    );
+    await client.exportProjectJson("oid-p1", { status: "completed" });
+    expect(lastCall()[0]).toBe(
+      "https://quire.io/api/project/export-json/oid-p1?status=completed",
+    );
+    await client.exportProjectJsonById("my_proj");
+    expect(lastCall()[0]).toBe(
+      "https://quire.io/api/project/export-json/id/my_proj",
+    );
+  });
+
+  it("task writes carry partner and sourceRef; updateTask clears etc / sourceRef with null", async () => {
+    const client = mkClient();
+    const sourceRef = { github: { repo: "acme/web", issue: 42 }, text: "Source: issue 42" };
+
+    await client.createTask("oid-p1", { name: "T", partner: "UI design team", sourceRef });
+    expect(lastBody()).toEqual({ name: "T", partner: "UI design team", sourceRef });
+
+    await client.createSubtask("oid-t1", { name: "S", partner: "oid-team" });
+    expect(lastBody()).toEqual({ name: "S", partner: "oid-team" });
+
+    await client.updateTask("oid-t1", { etc: null, sourceRef: null, partner: "oid-team" });
+    expect(lastBody()).toEqual({ etc: null, sourceRef: null, partner: "oid-team" });
+  });
+
+  it("createSublist takes all; membership changes take single", async () => {
+    const client = mkClient();
+
+    await client.createSublist("project", "oid-p1", { name: "L", all: true });
+    expect(lastBody()).toEqual({ name: "L", all: true });
+
+    await client.updateSublistMembership("oid-s1", [
+      { task: "oid-t1", single: true },
+      { task: "oid-t2", exclude: true },
+    ]);
+    expect(lastBody()).toEqual({
+      changes: [
+        { task: "oid-t1", single: true },
+        { task: "oid-t2", exclude: true },
+      ],
+    });
+  });
+
+  it("updateComment sends asUser in the body and compact as the query", async () => {
+    await mkClient().updateComment("oid-c1", {
+      pinned: true,
+      asUser: true,
+      compact: true,
+    });
+    expect(lastCall()[0]).toBe("https://quire.io/api/comment/oid-c1?return=compact");
+    expect(lastBody()).toEqual({ pinned: true, asUser: true });
+  });
+
+  it("updateProjectField sends select options with from", async () => {
+    await mkClient().updateProjectField("oid-p1", "Severity", {
+      options: [{ name: "Critical", from: "High" }, { name: "Low", color: "13" }],
+    });
+    expect(lastBody()).toEqual({
+      options: [{ name: "Critical", from: "High" }, { name: "Low", color: "13" }],
+    });
+  });
+});
