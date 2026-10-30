@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.2.6 — 2026-10-30
+
+Follows the **Oct 30 2026** server release and the API doc review behind it (zkoss/boeneo#26111). Methods keep their signatures and the new parameters are optional, but four types change to what the server returns, so code that relied on the old ones fails to compile: `QuireApprovalCategory.createdBy`, `QuireTask.sourceRef`, `QuireReminder.task.id` and `QuireRecurrence.interval`.
+
+- **Fix: `QuireApprovalCategory.createdBy` is a user object** — `{ oid, id, name }`, as every other `createdBy`. Until this release the server returned the creator's bare OID, which the client typed as `string`. Covered by PAC1.
+- **Fix: `QuireTask.sourceRef` is a JSON object** (`Record<string, unknown>`), not a string. It always was; the API doc now says so. Its `text`, if any, is the Markdown Quire shows as the task's source line, and each app keeps its own data under a key named after it.
+- **`sourceRef` and `partner` on task writes** — `createTask`, `createSubtask`, `createTaskRelative` and `updateTask` take both, as the API doc lists. A comment on `QuireTask.sourceRef` said the write path existed; it didn't.
+    - `sourceRef` is stored and returned as is, at most about 2,048 characters. On `updateTask` it replaces the whole object, another app's keys included, and `null` removes it. Covered by T13d.
+    - The server rejects as "too big" a `sourceRef` where a nested object or list is followed by a key with a string value, however small, the API doc's own example included. Until it is fixed, put such keys (`text`, say) first; the comment's example does.
+    - `partner` is the name or OID of one of the project's external teams; anything else is `400`, where an update used to ignore it. `updateTask` can't take a task off its team: `null` is `400` too. Covered by T13e.
+    - `QuireTask` declares `partner`, `partnerBy` and `archivedBy`.
+- **Search sends `created-by` and `source-ref`** — `QuireTaskSearchParams.createdBy` and `.sourceRef` keep their names but go out under the hyphenated ones the API doc now gives. The server still takes the camelCase names, so results don't change. `sourceRef` matches the tasks whose `sourceRef` has that key, whatever its value.
+- **Fix: `QuireReminder.task.id` is a number**, the task's integer ID, as on a task.
+- **`QuireRecurrence.interval` is optional** — a write may leave out `interval` (default `1`) and, for `daily`, `sincelatest` (default `false`); both were `400`. An `interval` of 0 or less is `400`, where it was taken as 1. Responses still carry `interval`. Covered by TR10.
+- **`updateTask`'s `etc` takes `null`** to clear the estimate; it was `400`. Covered by T13c.
+- **Sublists** — `createSublist` takes `all`: `true` puts every task of the owner in the sublist, to leave some out afterwards. `QuireSublist` declares it, and each change passed to `updateSublistMembership` takes `single`, which changes the task without its subtasks. Both were in the API doc but not in the client. Covered by SL14.
+    - `start` / `due` are dates only: they come back as `yyyy-MM-dd`, where they were a timestamp at midnight UTC, and a time of day is `400`. Covered by SL12.
+- **Comments** — `updateComment` takes `asUser`: `true` records the app as `editedBy`, and as `pinBy` when it pins. Covered by C3c.
+    - `QuireComment.owner` is typed `{ oid, id, type: "Task" | "Chat", … }`, where it was `unknown`. The server no longer returns the comment's `ownerType`, an internal number; read `owner.type`. Covered by C3.
+- **Exports take `status`** — `exportProjectCsv`, `exportProjectJson` and their by-ID forms take `{ status: "active" | "completed" | "all" }`, and the CSV ones `merge`, which puts a repeated header's values in one column. New exported types `QuireExportOptions` and `QuireExportCsvOptions`. Without options the URL is unchanged.
+- **Select options on `updateProjectField`** — `options` is typed `QuireFieldOptionUpdate[]` (new exported type): `{ name, color?, from? }`. `from` renames that option and the tasks set to it keep their value; without it an option no entry names is removed and its tasks lose the value. An entry without `color` keeps its color, and `[]` removes every option, as `conditionFormat: []` removes every rule. Offline test only.
+- **Attachment URLs are absolute everywhere** — `attachments[]` on tasks, comments and projects, a file custom field's value, and webhooks. Until this release the server gave a Quire file there as `/att/...`, and `QuireAttachment`'s comment said to prepend the server; it no longer does, and `type` lists the storage kinds (1 Google Drive … 5 Box). Covered by A2 and A4.
+- **The rest of the release changes only comments**:
+    - A value in use is `409` with body `code` 409: a status value on create or update (it was `400`, and `200` with nothing changed), and an approval category's `id` (it was `200` with the existing category). The README's error table has a `409` row. Covered by S9 and PAC1b.
+    - `402` with body `code` 469 for `undoRemoveTask` beyond the task limit, `transferTask` beyond the target's limits or bringing reminders into a plan without them, `updateProject`'s `public: true` without public projects, and an export below Professional, which now costs 1 unit.
+    - `updateProject`'s `start` / `due` take a project admin and a date only. Covered by P10.
+    - With read access, `addFollowers` / `removeFollowers` may name only yourself, and `followers` takes edit access even as `["me"]` (`updateProject`, `updateTask`, `updateDocument`, `updateChat`, and the README's Followers notes).
+    - The time-log methods return `[]` to a caller who can't see the project's time logs; reminders on a task the caller can't see are `404`, and a task reminder's `members` must all see the task; `partner` must be one of the project's teams; a notification `url` can't be `javascript:`; a task status filter outside 0..100 is `400`.
+- `COVERAGE.md` shows the export endpoints' optional query.
+
 ## 1.2.5 — 2026-10-29
 
 Follows the **Oct 29 2026** server release (production build 1862). Closes #1.
