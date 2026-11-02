@@ -1192,9 +1192,12 @@ export class QuireClient {
       section?: boolean;
       // Peekaboo (temporary hide). `true` = archive indefinitely;
       // positive integer = ms-since-epoch reshow timestamp (the server
-      // passes it straight through as the reshowAt param of scArchiveTask).
-      // `false` (unarchive) is currently broken server-side — tracked in
-      // zkoss/boeneo#24491 — so we deliberately don't support it here.
+      // passes it straight through as the reshowAt param of scArchiveTask,
+      // although the API doc says days — zkoss/boeneo#26130). `false`
+      // unarchives it, along with its archived ancestors and descendants
+      // (zkoss/boeneo#24491 fixed the 500 it used to be; see TP3). Archiving
+      // an archived task is a no-op, so to change its reshow time, send
+      // `false` first.
       peekaboo?: boolean | number;
       // Recurrence spec — pass a full rule to set/replace (Quire replaces, it
       // does NOT merge), pass `null` to clear an existing recurrence. See
