@@ -977,7 +977,7 @@ describe("Oct 30 2026 server release", () => {
     );
   });
 
-  it("exports take status, and CSV merge", async () => {
+  it("exports take status, and CSV merge and comments", async () => {
     fetchMock.mockImplementation(
       async () => new Response("x", { status: 200, headers: { "content-type": "text/csv" } }),
     );
@@ -990,6 +990,14 @@ describe("Oct 30 2026 server release", () => {
     await client.exportProjectCsvById("my_proj", { merge: false });
     expect(lastCall()[0]).toBe(
       "https://quire.io/api/project/export-csv/id/my_proj?merge=false",
+    );
+    await client.exportProjectCsv("oid-p1", { merge: true, comments: true });
+    expect(lastCall()[0]).toBe(
+      "https://quire.io/api/project/export-csv/oid-p1?merge=true&comments=true",
+    );
+    await client.exportProjectCsvById("my_proj", { comments: false });
+    expect(lastCall()[0]).toBe(
+      "https://quire.io/api/project/export-csv/id/my_proj?comments=false",
     );
     await client.exportProjectJson("oid-p1", { status: "completed" });
     expect(lastCall()[0]).toBe(

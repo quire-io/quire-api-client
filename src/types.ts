@@ -347,9 +347,10 @@ export interface QuireTask {
   // when it isn't shared with one.
   partner?: { oid: string; name: string; [key: string]: unknown };
   partnerBy?: { oid: string; id: string; name: string } | null;
-  // Peekaboo (archived) state. `reshowAt` is the auto-reshow timestamp (null
-  // means "never auto-reshow"); `peekaboo` is a derived `true` set whenever
-  // archivedAt is non-null. See tests/quire_api/task.test.ts TP1–TP3.
+  // Peekaboo (archived) state. `reshowAt` is the auto-reshow timestamp, set
+  // when it was hidden for a number of days or until a time (null means
+  // "never auto-reshow"); `peekaboo` is a derived `true` set whenever
+  // archivedAt is non-null. See tests/live/task-peekaboo.live.test.ts.
   reshowAt?: string | null;
   peekaboo?: boolean;
   // Recurrence spec — see QuireRecurrence above and docs/quire-recurring.md.

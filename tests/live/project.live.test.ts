@@ -203,6 +203,32 @@ describe.skipIf(!hasTokens)("Live API — /project", () => {
     expect(csv).toContain(",");
   });
 
+  // Nov 3 2026: `comments` adds each task's comments, as
+  // `<author>, <when>:\n<text>`; without it there are none.
+  it("P8c exportProjectCsv({comments:true}) includes the task comments", async () => {
+    const task = await client.createTask(project!.oid, {
+      name: `${runTag}-export-comments`,
+    });
+    try {
+      const text = `${runTag} exported comment`;
+      await client.addComment(task.oid, text);
+
+      const withComments = await client.exportProjectCsv(project!.oid, {
+        comments: true,
+      });
+      expect(withComments).toContain(text);
+      const merged = await client.exportProjectCsvById(TEST_PROJECT_ID, {
+        comments: true,
+        merge: true,
+      });
+      expect(merged).toContain(text);
+      const without = await client.exportProjectCsv(project!.oid);
+      expect(without).not.toContain(text);
+    } finally {
+      await client.deleteTask(task.oid).catch(() => {});
+    }
+  });
+
   it("P9 exportProjectJson returns a JSON string", async () => {
     const json = await client.exportProjectJson(project!.oid);
     expect(typeof json).toBe("string");

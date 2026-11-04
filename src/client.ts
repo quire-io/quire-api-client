@@ -311,12 +311,21 @@ export interface QuireExportOptions {
 export interface QuireExportCsvOptions extends QuireExportOptions {
   /** Merge the values of a repeated header, such as every tag, into one column. Default false. */
   merge?: boolean;
+  /**
+   * Include task comments, oldest first, each in a column of its own, or all
+   * of a task's in one column, separated by a blank line, with `merge`. Each
+   * is `<author>, <when>:\n<text>`, in the user's locale and time zone;
+   * comments without text are skipped. Default false.
+   */
+  comments?: boolean;
 }
 
 function exportQuery(options: QuireExportCsvOptions): string {
   const parts: string[] = [];
   if (options.status !== undefined) parts.push(`status=${options.status}`);
   if (options.merge !== undefined) parts.push(`merge=${options.merge}`);
+  if (options.comments !== undefined)
+    parts.push(`comments=${options.comments}`);
   return parts.length > 0 ? `?${parts.join("&")}` : "";
 }
 
@@ -637,7 +646,8 @@ export class QuireClient {
   //
   // `status` exports only the active or completed tasks (default `all`);
   // CSV's `merge` puts the values of a repeated header, such as every tag,
-  // in one column. Professional plan and above: a lower plan is 402 with
+  // in one column, and its `comments` (Nov 3 2026) adds the task comments.
+  // Professional plan and above: a lower plan is 402 with
   // body `code` 469, which since Oct 30 2026 costs 1 unit, not an export's.
   // -----------------------------------------------------------------------
 
@@ -1029,6 +1039,14 @@ export class QuireClient {
       // directly. Safe at creation time — no side effects.
       milestone?: boolean;
       section?: boolean;
+      // Peekaboo: create the task hidden, as updateTask's does. `true` hides
+      // it indefinitely; a positive integer up to 10000, for that many
+      // days; a larger one, until then in ms since the epoch; a date/time
+      // string, until then: `2026-11-04T09:30Z` (UTC), or a date only for
+      // 6 AM that day in the user's time zone. A time must be in the future,
+      // or 400 — one in seconds is in 1970 — and the task shows again within
+      // the hour after it. Before Nov 3 2026 a time was 400 here.
+      peekaboo?: boolean | number | string;
       // Recurrence spec — see docs/quire-recurring.md for the wire shape.
       recurrence?: QuireRecurrence;
       // The external team to share the task with: the name or OID of one of
@@ -1078,6 +1096,7 @@ export class QuireClient {
       section?: boolean;
       recurrence?: QuireRecurrence;
       // See createTask.
+      peekaboo?: boolean | number | string;
       partner?: string;
       sourceRef?: Record<string, unknown>;
       customFields?: Record<string, unknown>;
@@ -1118,6 +1137,7 @@ export class QuireClient {
       section?: boolean;
       recurrence?: QuireRecurrence;
       // See createTask.
+      peekaboo?: boolean | number | string;
       partner?: string;
       sourceRef?: Record<string, unknown>;
       customFields?: Record<string, unknown>;
@@ -1190,15 +1210,17 @@ export class QuireClient {
       // pass through verbatim here.
       milestone?: boolean;
       section?: boolean;
-      // Peekaboo (temporary hide). `true` = archive indefinitely;
-      // positive integer = ms-since-epoch reshow timestamp (the server
-      // passes it straight through as the reshowAt param of scArchiveTask,
-      // although the API doc says days — zkoss/boeneo#26130). `false`
-      // unarchives it, along with its archived ancestors and descendants
-      // (zkoss/boeneo#24491 fixed the 500 it used to be; see TP3). Archiving
-      // an archived task is a no-op, so to change its reshow time, send
-      // `false` first.
-      peekaboo?: boolean | number;
+      // Peekaboo (temporary hide). `true`, an integer or a date/time string
+      // hide the task as on createTask: indefinitely, for that many days (up
+      // to 10000), or until that time (a larger integer in ms since the
+      // epoch, or `2026-11-04T09:30Z`; a date only is 6 AM that day in the
+      // user's time zone). A past time is 400. Until Nov 3 2026 every
+      // integer was read as ms since the epoch, so `7` showed the task again
+      // at once (zkoss/boeneo#26130). `false` unarchives it, along with its
+      // archived ancestors and descendants (zkoss/boeneo#24491 fixed the 500
+      // it used to be; see TP3). Archiving an archived task is a no-op, so
+      // to change its reshow time, send `false` first.
+      peekaboo?: boolean | number | string;
       // Recurrence spec — pass a full rule to set/replace (Quire replaces, it
       // does NOT merge), pass `null` to clear an existing recurrence. See
       // docs/quire-recurring.md and TR8 / TR9 in tests/quire_api/task.test.ts.
