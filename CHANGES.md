@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.7 — 2026-11-04
+
+Follows the **Nov 3 2026** server release (production build 1863). New optional parameters only; `peekaboo` widens to `boolean | number | string`.
+
+- **CSV export takes `comments`** — `exportProjectCsv` and `exportProjectCsvById` take `{ comments: true }` to include each task's comments, oldest first, as `<author>, <when>:` and the text on the next line. Each is in a column of its own, or a task's are all in one column, separated by a blank line, with `merge`. Comments without text are skipped. Covered by P8c.
+- **`peekaboo` as a time** — on task create and update alike, `true` hides a task indefinitely, a positive integer up to 10000 for that many days, and a larger one until then, in milliseconds since the epoch. It also takes a date/time string, such as `2026-11-04T09:30Z`, or a date only, for 6 AM that day in the user's time zone. A past time, such as one in seconds, is `400`; the task shows again within the hour after the time. Covered by TP4-TP8.
+    - `updateTask` used to read every integer as such a time, so `7` showed the task again at once. Its comment said so; it now says this.
+    - `createTask`, `createSubtask` and `createTaskRelative` take `peekaboo`, which the API doc has listed but the client didn't take.
+    - `updateTask`'s comment also notes that `false` unarchives the task along with its archived ancestors and descendants, where it used to be `500`, and that archiving an archived task does nothing, so changing the reshow time takes `false` first.
+
 ## 1.2.6 — 2026-10-30
 
 Follows the **Oct 30 2026** server release and the API doc review behind it (zkoss/boeneo#26111). Methods keep their signatures and the new parameters are optional, but four types change to what the server returns, so code that relied on the old ones fails to compile: `QuireApprovalCategory.createdBy`, `QuireTask.sourceRef`, `QuireReminder.task.id` and `QuireRecurrence.interval`.
