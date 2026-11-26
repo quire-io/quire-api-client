@@ -167,6 +167,21 @@ export interface QuireFieldDefinition {
   // No one can edit the values in Quire, admins included; the API still
   // can, e.g. to push values from another system.
   locked?: boolean;
+  // Whether you can SET this field's values through the API, on the tasks
+  // you can edit (changing the definition itself still needs an admin).
+  // `false` for a `formula` field, when you can't edit tasks in the project
+  // (a guest, or an app not granted editing tasks), and when the field's
+  // `viewMembers` / `editMembers` leaves you out (an empty list admits the
+  // admins only). `locked` doesn't count, since the API ignores it.
+  // Returned on a project's fields only — not insight fields, not webhooks —
+  // and ignored when adding or updating a field.
+  //
+  // Added Nov 18 2026 as `valueEditable` and renamed to `editable` on
+  // Nov 24 2026. The server still returns `valueEditable` too for now, with
+  // the same value; read `editable`.
+  editable?: boolean;
+  /** @deprecated Nov 24 2026 alias of `editable`; still returned for now. */
+  valueEditable?: boolean;
   [key: string]: unknown;
 }
 
@@ -430,6 +445,10 @@ export interface QuireTag {
   nameHtml?: string;
   color?: string;
   url?: string;
+  // true: available across the organization's projects; false: limited to
+  // one project. Change it on updateTag (Nov 13 2026) — see its `global` /
+  // `project`.
+  global?: boolean;
   createdBy?: { oid: string; id: string; name: string };
   createdAt?: string;
   [key: string]: unknown;

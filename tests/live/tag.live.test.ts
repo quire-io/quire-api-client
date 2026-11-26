@@ -1,5 +1,5 @@
 /**
- * Live API tests for /tag (TAG1, TAG1b, TAG2, TAG2a, TAG3, TAG4).
+ * Live API tests for /tag (TAG1, TAG1b, TAG2, TAG2a, TAG2b, TAG3, TAG4).
  *
  * Quire auto-assigns a color from its fixed 2-digit palette when `color`
  * is omitted on create (boeneo's `correctColor` → `nextIconColor`).
@@ -15,7 +15,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { NAMED_COLORS } from "../../src/index.js";
 import type { QuireTag } from "../../src/index.js";
-import { hasTokens, liveClient, readEnv, runTag } from "./helpers.js";
+import { hasTokens, liveClient, rawApi, readEnv, runTag } from "./helpers.js";
 
 describe.skipIf(!hasTokens)("Live API — /tag", () => {
   const client = liveClient();
@@ -69,6 +69,16 @@ describe.skipIf(!hasTokens)("Live API — /tag", () => {
     });
     expect(t.nameText ?? t.name).toBe(`${TAG_NAME}-renamed`);
     expect(t.color).toBe("34");
+  });
+
+  it("TAG2b updateTag with project but no global is 400 (Nov 13 2026)", async () => {
+    // `project` is taken only alongside `global`; without it the server
+    // rejects the update. rawApi so we can read the status rather than
+    // catch the thrown error.
+    const { status } = await rawApi("PUT", `/tag/${tagOid}`, {
+      project: PROJECT_OID,
+    });
+    expect(status).toBe(400);
   });
 
   it("TAG3 deleteTag removes the tag", async () => {

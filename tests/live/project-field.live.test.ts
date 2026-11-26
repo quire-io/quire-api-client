@@ -1,8 +1,9 @@
 /**
  * Live API tests for who can view and edit a project's custom field
- * (PF1-PF7), added in the Oct 15 2026 server release: `viewMembers`,
+ * (PF1-PF8), added in the Oct 15 2026 server release: `viewMembers`,
  * `editMembers` and `locked` on add-field / update-field, and their effect
- * on the field's values.
+ * on the field's values. PF8 covers the `editable` flag a field definition
+ * carries from the Nov 18 / Nov 24 2026 releases.
  *
  *   - `viewMembers` / `editMembers` are sent as user refs and returned as
  *     user objects; absent means no restriction, `[]` the admins only. An
@@ -160,5 +161,17 @@ describe.skipIf(!hasTokens)("Live API — project custom field access", () => {
     const write = await writeValue(name, "changed");
     expect(write.status).toBe(400);
     expect(await readValue(name)).toBe("seen");
+  });
+
+  it("PF8 a field the caller can edit returns editable: true, with the valueEditable alias (Nov 18 / Nov 24 2026)", async () => {
+    const { name } = await addField("pf8", {});
+    const project = await client.getProject(PROJECT_OID);
+    const def = project.fields?.[name];
+    // The caller is the project admin that created it, so the values are
+    // editable through the API.
+    expect(def?.editable).toBe(true);
+    // Nov 24 2026 renamed `valueEditable` to `editable` but kept it as an
+    // alias, same value, for now.
+    expect(def?.valueEditable).toBe(def?.editable);
   });
 });

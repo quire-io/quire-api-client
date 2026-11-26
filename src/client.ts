@@ -1756,7 +1756,19 @@ export class QuireClient {
 
   async updateTag(
     tagOid: string,
-    body: { name?: string; color?: string },
+    body: {
+      name?: string;
+      color?: string;
+      // Move the tag between global and project scope (Nov 13 2026).
+      // `true`: available across the organization's projects. `false`:
+      // limited to one project, and then `project` is REQUIRED.
+      global?: boolean;
+      // The OID of the project the tag is limited to. Required when
+      // `global` is false, ignored when it is true. Passing `project`
+      // WITHOUT `global` is 400. With `global: false` in an organization,
+      // the project must belong to the tag's organization, else 404.
+      project?: string;
+    },
   ): Promise<QuireTag> {
     return this.fetch<QuireTag>(`/tag/${tagOid}`, {
       method: "PUT",
