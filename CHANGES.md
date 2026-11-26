@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.8 — 2026-11-26
+
+Follows the **Nov 6**, **Nov 13**, **Nov 18** and **Nov 24 2026** server releases. New optional fields only; nothing changes on the wire for existing calls.
+
+- **Field `editable`** — a `QuireFieldDefinition` now carries `editable`: whether you can set that field's values through the API, on the tasks you can edit. It's `false` for a `formula` field, when you can't edit tasks in the project (a guest, or an app not granted editing tasks), and when the field's `viewMembers` / `editMembers` leaves you out (an empty list admits the admins only); `locked` doesn't count. Returned on a project's fields only, and ignored when adding or updating a field. The Nov 18 release added it as `valueEditable`; Nov 24 renamed it to `editable` and keeps `valueEditable` as an alias, same value, for now. `QuireFieldDefinition` declares both; read `editable`. Covered by PF8.
+- **`updateTag` moves a tag between scopes** — the body takes `global` and `project` (Nov 13). `global: true` makes the tag available across the organization's projects; `global: false` limits it to one `project`, which is then required. `project` is the project's OID, ignored when `global` is true. Passing `project` without `global` is `400`; with `global: false` in an organization, the project must belong to the tag's organization, else `404`. `QuireTag` declares `global`. Covered by TAG2b.
+- **No code change:**
+    - **Webhook `taskSummaries`** (Nov 6) — each task in a webhook's `taskSummaries` now also carries `nameText` / `nameHtml` and `descriptionText` / `descriptionHtml`, as a task's GET does. The client doesn't model webhook payloads, so nothing changes here.
+    - **Task `createdAt` / `createdBy` on update** (Nov 13) — the server now rejects them with `400`. `updateTask`'s body never offered either, so the client's surface is unchanged.
+
 ## 1.2.7 — 2026-11-04
 
 Follows the **Nov 3 2026** server release (production build 1863). New optional parameters only; `peekaboo` widens to `boolean | number | string`.
